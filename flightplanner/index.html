@@ -1,237 +1,1552 @@
 <!DOCTYPE html>
 <html lang="pt-BR">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>LabDrones - FlightPlanner (Em Construção)</title>
-    <style>
-        :root {
-            --bg-color: #f8f9fa;
-            --card-bg: #ffffff;
-            --text-color: #1a1a1a;
-            --accent-color: #27ae60;
-            --border-color: #e0e0e0;
-        }
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+<title>Plano de Voo</title>
 
-        body {
-            margin: 0;
-            padding: 0;
-            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
-            background-color: var(--bg-color);
-            color: var(--text-color);
-            display: flex;
-            flex-direction: column;
-            min-height: 100vh;
-            justify-content: space-between;
-        }
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet.draw/1.0.4/leaflet.draw.css">
 
-        header {
-            background-color: #ffffff;
-            border-bottom: 2px solid #1a1a1a;
-            padding: 20px 0;
-            text-align: center;
-        }
+<style>
+:root{
+  --sidebar-bg:#2c3e50;
+  --sidebar-bg-2:#34495e;
+  --sidebar-w:300px;
+  --accent:#27ae60;
+  --danger:#c0392b;
+}
 
-        .header-container {
-            max-width: 800px;
-            margin: 0 auto;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            gap: 15px;
-            padding: 0 20px;
-        }
+*{ box-sizing:border-box; }
+html,body{ margin:0; padding:0; height:100%; font-family:Arial, Helvetica, sans-serif; }
 
-        .logo-img {
-            width: 70px;
-            height: 70px;
-            object-fit: contain;
-        }
+body{ display:flex; overflow:hidden; }
 
-        .header-title h1 {
-            margin: 0;
-            font-size: 24px;
-            letter-spacing: 1px;
-            text-transform: uppercase;
-        }
+/* ---------------------------------------------------------------- SIDEBAR */
+#sidebar{
+  width:var(--sidebar-w);
+  min-width:var(--sidebar-w);
+  height:100%;
+  background:var(--sidebar-bg);
+  color:#ecf0f1;
+  padding:14px 15px 30px;
+  overflow-y:auto;
+  z-index:1200;
+  box-shadow:2px 0 8px rgba(0,0,0,.35);
+  transition:transform .3s ease, margin-left .3s ease;
+  position:relative;
+  flex:0 0 var(--sidebar-w);
+}
+#sidebar.collapsed{ margin-left:calc(-1 * var(--sidebar-w)); transform:translateX(-100%); }
 
-        .header-title p {
-            margin: 3px 0 0 0;
-            color: #666;
-            font-size: 13px;
-        }
+#toggle-btn{
+  position:fixed;
+  left:var(--sidebar-w);
+  top:12px;
+  width:30px;
+  height:44px;
+  background:var(--sidebar-bg);
+  color:#fff;
+  border:none;
+  border-radius:0 6px 6px 0;
+  cursor:pointer;
+  font-size:15px;
+  box-shadow:2px 0 6px rgba(0,0,0,.25);
+  z-index:1400;
+  transition:left .3s ease;
+}
+#sidebar.collapsed ~ #toggle-btn{ left:0; }
 
-        main {
-            max-width: 650px;
-            margin: 40px auto;
-            padding: 0 20px;
-            text-align: center;
-        }
+#sidebar h1{
+  font-size:17px;
+  margin:0 0 12px;
+  font-weight:700;
+}
+.version-tag{
+  font-size:10px;
+  font-weight:600;
+  color:#9fb3c8;
+  background:rgba(255,255,255,.08);
+  padding:2px 6px;
+  border-radius:4px;
+  vertical-align:middle;
+  margin-left:4px;
+}
 
-        .status-card {
-            background-color: var(--card-bg);
-            border: 2px solid var(--border-color);
-            border-radius: 12px;
-            padding: 40px 30px;
-            box-shadow: 0 8px 16px rgba(0,0,0,0.06);
-        }
+/* ------------------------------------------------------------------- TABS */
+.tabs{ display:grid; grid-template-columns:1fr 1fr; gap:4px; margin-bottom:12px; }
+.tab{
+  margin:0; padding:9px 4px;
+  background:var(--sidebar-bg-2); color:#cdd8e2;
+  font-size:12px; font-weight:700;
+  border:none; border-radius:6px; cursor:pointer;
+  white-space:nowrap; overflow:hidden; text-overflow:ellipsis;
+}
+.tab.active{ background:var(--accent); color:#fff; }
+.tabpane[hidden]{ display:none; }
 
-        .icon-container {
-            display: flex;
-            justify-content: center;
-            align-items: center;
-            margin-bottom: 20px;
-        }
+/* ---------------------------------------------------------------- ACCORDION */
+.accordion-header{
+  display:flex; align-items:center; justify-content:space-between;
+  cursor:pointer; user-select:none;
+}
+.accordion-header .chevron{
+  font-size:11px; color:#9fb3c8; transition:transform .2s ease; flex:0 0 auto; margin-left:8px;
+}
+.accordion-header.collapsed .chevron{ transform:rotate(-90deg); }
+.accordion-body[hidden]{ display:none; }
+.accordion-body{ margin-top:8px; }
 
-        .badge-construction {
-            display: inline-block;
-            background-color: #f39c12;
-            color: #ffffff;
-            font-size: 12px;
-            font-weight: bold;
-            text-transform: uppercase;
-            padding: 5px 12px;
-            border-radius: 20px;
-            letter-spacing: 1px;
-            margin-bottom: 15px;
-        }
+.group{
+  border-top:1px solid var(--sidebar-bg-2);
+  padding-top:12px;
+  margin-top:12px;
+}
+.group:first-of-type{ border-top:none; margin-top:0; padding-top:0; }
 
-        h2 {
-            margin: 0 0 15px 0;
-            font-size: 26px;
-            color: #1a1a1a;
-        }
+.group > h2{
+  font-size:13px;
+  text-transform:uppercase;
+  letter-spacing:.04em;
+  color:#9fb3c8;
+  margin:0 0 8px;
+}
 
-        p {
-            color: #555;
-            font-size: 15px;
-            line-height: 1.6;
-            margin-bottom: 25px;
-        }
+.subsection{
+  margin-top:10px;
+  padding:10px;
+  background:rgba(0,0,0,.16);
+  border-radius:6px;
+}
+.subsection > h3{ font-size:12px; margin:0 0 4px; color:#cdd8e2; }
 
-        .btn-group {
-            display: flex;
-            gap: 15px;
-            justify-content: center;
-            align-items: center;
-            flex-wrap: wrap;
-        }
+.hint{ color:#8ba0b4; font-size:11px; line-height:1.4; margin:2px 0 8px; }
 
-        .btn {
-            display: inline-flex;
-            align-items: center;
-            justify-content: center;
-            gap: 8px;
-            text-decoration: none;
-            padding: 12px 22px;
-            border-radius: 6px;
-            font-weight: bold;
-            font-size: 14px;
-            transition: all 0.2s;
-        }
+label{ font-size:11.5px; font-weight:bold; color:#bdc9d4; display:block; margin:6px 0 3px; }
 
-        .btn-primary {
-            background-color: #1a1a1a;
-            color: #ffffff;
-        }
+select,input[type="number"],input[type="text"]{
+  width:100%;
+  padding:8px;
+  border:none;
+  border-radius:5px;
+  background:var(--sidebar-bg-2);
+  color:#fff;
+  font-size:13px;
+}
+select[multiple]{ padding:2px; }
+input[type="file"]{
+  width:100%;
+  font-size:11.5px;
+  margin:4px 0 6px;
+  color:#cdd8e2;
+}
+input[type="checkbox"]{ width:15px; height:15px; flex:0 0 auto; accent-color:var(--accent); }
 
-        .btn-primary:hover {
-            background-color: #333333;
-        }
+button{
+  width:100%;
+  padding:9px;
+  margin-top:7px;
+  border:none;
+  border-radius:5px;
+  background:#dfe4e8;
+  color:#20303d;
+  cursor:pointer;
+  font-size:13px;
+  font-weight:600;
+  min-height:40px;
+}
+button:hover{ background:#c9d2da; }
+button.primary{ background:var(--accent); color:#fff; }
+button.primary:hover{ background:#219150; }
+button.danger{ background:var(--danger); color:#fff; }
+button.danger:hover{ background:#a83224; }
+button.ghost{
+  background:transparent;
+  color:#cdd8e2;
+  border:1px solid var(--sidebar-bg-2);
+}
+button.ghost:hover{ background:var(--sidebar-bg-2); }
+button.active{ background:#f39c12; color:#20303d; }
 
-        .btn-secondary {
-            background-color: #e2e8f0;
-            color: #1a1a1a;
-        }
+.row{ display:flex; gap:6px; }
+.row > *{ flex:1; }
 
-        .btn-secondary:hover {
-            background-color: #cbd5e1;
-        }
+/* ------------------------------------------------ visualization (camadas) */
+.viz-group{ border-top:1px solid var(--sidebar-bg-2); padding:4px 0; }
+.viz-group:first-child{ border-top:none; }
 
-        footer {
-            text-align: center;
-            padding: 20px;
-            border-top: 1px solid var(--border-color);
-            color: #777;
-            font-size: 13px;
-            background-color: #ffffff;
-        }
-    </style>
+.viz-row{ display:flex; align-items:center; gap:7px; padding:4px 2px; font-size:12.5px; }
+.viz-master .v-name{ flex:1; font-weight:bold; }
+.v-count{ color:#8ba0b4; font-size:11px; min-width:16px; text-align:right; }
+.swatch{ width:12px; height:12px; border-radius:3px; flex:0 0 auto; }
+
+.viz-children{ max-height:220px; overflow-y:auto; }
+.viz-children[hidden]{ display:none; }
+.viz-child{ padding-left:22px; color:#cdd8e2; cursor:pointer; }
+.viz-child span{ overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+
+.v-expand,.trash{
+  background:none; border:none; color:#8ba0b4; cursor:pointer;
+  width:auto; min-height:auto; margin:0; padding:2px 4px; font-size:12px;
+}
+.v-expand:hover,.trash:hover{ color:#fff; background:none; }
+
+.buffer-legend{ display:flex; align-items:center; gap:6px; font-size:11.5px; margin:3px 0; }
+.buffer-legend .sw{ width:12px; height:12px; border-radius:2px; }
+
+.status{ font-size:11px; color:#9fb3c8; margin-top:8px; min-height:14px; line-height:1.4; }
+
+/* ------------------------------------------------------------------- MAP */
+#map{ flex:1; height:100%; background:#e0e0e0; }
+
+/* -------------------------------------------------- coordinates panel */
+#coordPanel{
+  position:absolute;
+  right:12px;
+  top:12px;
+  width:360px;
+  max-width:calc(100vw - 24px);
+  max-height:70vh;
+  background:#fff;
+  border-radius:8px;
+  box-shadow:0 4px 20px rgba(0,0,0,.35);
+  z-index:1300;
+  display:flex;
+  flex-direction:column;
+  overflow:hidden;
+}
+#coordPanel[hidden]{ display:none; }
+#coordPanel header{
+  display:flex;
+  justify-content:space-between;
+  align-items:center;
+  padding:10px 12px;
+  background:var(--sidebar-bg);
+  color:#fff;
+  font-size:13px;
+  font-weight:700;
+}
+#coordPanel header button{
+  width:auto; min-height:auto; margin:0; padding:2px 8px;
+  background:transparent; color:#fff; font-size:16px;
+}
+#coordPanel pre{
+  margin:0;
+  padding:10px 12px;
+  overflow:auto;
+  font-size:11px;
+  line-height:1.45;
+  flex:1;
+  white-space:pre-wrap;
+  word-break:break-all;
+}
+#coordPanel .actions{
+  display:flex;
+  gap:6px;
+  padding:8px 12px;
+  border-top:1px solid #e0e0e0;
+}
+#coordPanel .actions button{ margin:0; font-size:12px; min-height:36px; }
+
+/* --------------------------------------------------------------- MOBILE */
+@media (max-width:768px){
+  #sidebar{
+    position:absolute;
+    left:0; top:0;
+    flex-basis:0;
+    box-shadow:2px 0 16px rgba(0,0,0,.5);
+  }
+  #map{ width:100%; }
+  #coordPanel{ width:auto; top:auto; bottom:12px; right:12px; left:12px; max-height:55vh; }
+}
+
+.leaflet-draw-toolbar a{ background-color:#fff; }
+.shape-tools a{ font-size:16px; text-align:center; line-height:30px; background:#fff; }
+.shape-tools a.active{ background:#f39c12; }
+</style>
 </head>
+
 <body>
 
-    <header>
-        <div class="header-container">
-            <!-- Logo do LabDrones na raiz -->
-            <img src="../logo_labdrones.png" alt="Logo LabDrones" class="logo-img" onerror="this.style.display='none'">
-            <div class="header-title">
-                <h1>LabDrones</h1>
-                <p>Plataforma Integrada de Geotecnologias</p>
+<div id="sidebar">
+
+  <h1>✈️ Plano de Voo <span class="version-tag" title="Versão interna da ferramenta">v0.0.1</span></h1>
+
+  <div class="tabs">
+    <button class="tab active" data-tab="viz">📚 Camadas</button>
+    <button class="tab" data-tab="restr">🚧 Restrições</button>
+    <button class="tab" data-tab="voos">🛰️ Voos</button>
+    <button class="tab" data-tab="plan">✈️ Planejar Voo</button>
+  </div>
+
+  <!-- ================================================= ABA: CAMADAS -->
+  <div id="tab-viz" class="tabpane">
+    <div class="hint">
+      Marque para exibir a camada inteira; expanda (▸) para ligar/desligar itens
+      individuais; use a lixeira para remover os dados.
+    </div>
+    <div id="vizLayers"></div>
+    <div class="hint" style="margin-top:10px;">O mapa de fundo é trocado pelo botão de camadas no canto superior direito do mapa.</div>
+  </div>
+
+  <!-- ================================================ ABA: RESTRIÇÕES -->
+  <div id="tab-restr" class="tabpane" hidden>
+
+    <!-- ------------------------------------------------------ AEROPORTOS -->
+    <div class="group">
+      <h2>Aeroportos</h2>
+      <div class="hint">Camada de complexos aeroportuários (IBGE/SGB via WFS) ou geometria própria.</div>
+      <button id="loadWFS">Carregar aeroportos (WFS)</button>
+      <label>Ou envie sua geometria (GeoJSON/KML)</label>
+      <input type="file" id="uploadAeroporto" accept=".geojson,.json,.kml">
+
+      <label>Formato da zona de restrição</label>
+      <select id="bufferShape">
+        <option value="circular">Circular (raio)</option>
+        <option value="retangular">Retangular</option>
+      </select>
+
+      <label>Distâncias das zonas (m)</label>
+      <div class="row">
+        <input type="number" id="buf0" value="50"  min="1" step="10">
+        <input type="number" id="buf1" value="80"  min="1" step="10">
+        <input type="number" id="buf2" value="100" min="1" step="10">
+      </div>
+      <button id="applyBuffers">Aplicar zonas de restrição</button>
+      <div id="statusAeroportos" class="status"></div>
+    </div>
+
+    <!-- --------------------------------------------- LEGENDA DAS ZONAS -->
+    <div class="group">
+      <h2>Zonas de restrição — cores</h2>
+      <div class="buffer-legend"><span class="sw" style="background:#e53935"></span> <span id="lg0">50 m</span></div>
+      <div class="buffer-legend"><span class="sw" style="background:#fdd835"></span> <span id="lg1">80 m</span></div>
+      <div class="buffer-legend"><span class="sw" style="background:#43a047"></span> <span id="lg2">100 m</span></div>
+    </div>
+  </div>
+
+  <!-- ==================================================== ABA: VOOS -->
+  <div id="tab-voos" class="tabpane" hidden>
+    <div class="group">
+      <h2>Voos anteriores (banco INPE)</h2>
+      <div class="hint">Carregado automaticamente do banco do GeoCatalog. Envie outro GeoJSON para substituir, ou volte ao padrão. Filtro por ano e plataforma.</div>
+      <input type="file" id="uploadVoos" accept=".geojson,.json">
+      <button id="reloadVoosPadrao" class="ghost">↺ Usar banco padrão</button>
+      <label>Ano</label>
+      <select id="filterAno" multiple size="4"></select>
+      <label>Plataforma</label>
+      <select id="filterPlatform" multiple size="3"></select>
+      <button id="applyFilterVoos">Aplicar filtro</button>
+      <div id="statusVoos" class="status"></div>
+    </div>
+  </div>
+
+  <!-- =============================================== ABA: PLANEJAR VOO -->
+  <div id="tab-plan" class="tabpane" hidden>
+
+    <!-- ----------------------------------------------------- PLANO DE VOO -->
+    <div class="group">
+      <h2 class="accordion-header" data-target="acc-plano">Plano de voo <span class="chevron">▾</span></h2>
+      <div class="accordion-body" id="acc-plano">
+        <div class="hint">Desenhe a rota com as ferramentas no canto do mapa, gere uma área a partir de um ponto, ou importe um KML.</div>
+        <input type="file" id="uploadKML" accept=".kml">
+
+        <div class="subsection">
+          <h3>Área a partir de um ponto</h3>
+          <div class="hint">Jeito rápido de montar o plano: defina o formato e as medidas, clique em "Selecionar ponto no mapa" e depois num ponto do mapa.</div>
+
+          <label>Formato</label>
+          <select id="areaShape">
+            <option value="circle">Círculo</option>
+            <option value="rect">Retângulo</option>
+          </select>
+
+          <div id="areaCircleFields">
+            <label>Raio (m)</label>
+            <input type="number" id="areaRadius" value="1000" min="1" step="50">
+          </div>
+
+          <div id="areaRectFields" hidden>
+            <div class="row">
+              <div><label>Largura (m)</label><input type="number" id="areaWidth"  value="1000" min="1" step="50"></div>
+              <div><label>Altura (m)</label> <input type="number" id="areaHeight" value="1000" min="1" step="50"></div>
             </div>
+          </div>
+
+          <button id="pickPoint">Selecionar ponto no mapa</button>
+          <div id="statusArea" class="status"></div>
         </div>
-    </header>
 
-    <main>
-        <div class="status-card">
-            <!-- Tag de Status -->
-            <span class="badge-construction">🛠️ Módulo em Desenvolvimento</span>
-
-            <!-- Ícone do Módulo FlightPlanner (Drone com +) -->
-            <div class="icon-container">
-                <svg width="72" height="72" viewBox="0 0 24 24" fill="none" stroke="#1a1a1a" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
-                    <rect x="10" y="10" width="4" height="4" rx="1" fill="#1a1a1a" />
-                    <line x1="6" y1="6" x2="10" y2="10" stroke="#1a1a1a" />
-                    <line x1="18" y1="6" x2="14" y2="10" stroke="#1a1a1a" />
-                    <line x1="6" y1="18" x2="10" y2="14" stroke="#1a1a1a" />
-                    <line x1="18" y1="18" x2="14" y2="14" stroke="#1a1a1a" />
-                    <circle cx="5" cy="5" r="2.5" stroke="#1a1a1a" fill="#ffffff" />
-                    <circle cx="19" cy="5" r="2.5" stroke="#1a1a1a" fill="#ffffff" />
-                    <circle cx="5" cy="19" r="2.5" stroke="#1a1a1a" fill="#ffffff" />
-                    <circle cx="19" cy="19" r="2.5" stroke="#1a1a1a" fill="#ffffff" />
-                    <circle cx="18.5" cy="18.5" r="4.5" fill="#f39c12" stroke="#ffffff" stroke-width="1.5" />
-                    <line x1="18.5" y1="16" x2="18.5" y2="21" stroke="#ffffff" stroke-width="1.5" />
-                    <line x1="16" y1="18.5" x2="21" y2="18.5" stroke="#ffffff" stroke-width="1.5" />
-                </svg>
-            </div>
-
-            <h2>LabDrones FlightPlanner</h2>
-            <p>
-                A ferramenta para planejamento interativo, estimativa de cobertura e parametrização pré-campo de futuros planos de voo está sendo preparada e será disponibilizada em breve.
-            </p>
-
-            <!-- Botões de Navegação -->
-            <div class="btn-group">
-                <a href="../" class="btn btn-primary">◀ Voltar ao Portal Principal</a>
-                
-                <a href="../geocatalog/" class="btn btn-secondary">
-                    <!-- Ícone do GeoCatalog (Globo + Drone) dentro do Botão -->
-                    <svg width="22" height="22" viewBox="0 0 32 32" fill="none" stroke="#1a1a1a" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
-                        <circle cx="14" cy="14" r="10" fill="#e0f2fe" stroke="#0284c7" stroke-width="1.5" />
-                        <path d="M 7 7 C 9 6, 11 8, 10 11 C 8 12, 6 10, 5 11 C 4 12, 6 14, 7 16 C 8 18, 11 18, 12 21 C 10 23, 7 23, 5 20 C 3 17, 3 13, 7 7 Z" fill="#4ade80" stroke="#16a34a" stroke-width="0.8" opacity="0.9" />
-                        <path d="M 17 5 C 19 5, 21 7, 20 10 C 18 11, 16 9, 15 11 C 16 13, 19 14, 18 18 C 17 21, 19 22, 21 20 C 23 17, 24 14, 24 12 C 24 8, 20 5, 17 5 Z" fill="#4ade80" stroke="#16a34a" stroke-width="0.8" opacity="0.9" />
-                        <path d="M 4 14 H 24 M 14 4 A 10 10 0 0 0 14 24 M 14 4 A 10 10 0 0 1 14 24" stroke="#0284c7" stroke-width="0.8" stroke-dasharray="2 1.5" opacity="0.6" />
-                        
-                        <g transform="translate(13, 13) scale(0.65)">
-                            <rect x="10" y="10" width="4" height="4" rx="1" fill="#1a1a1a" />
-                            <line x1="6" y1="6" x2="10" y2="10" stroke="#1a1a1a" stroke-width="2" />
-                            <line x1="18" y1="6" x2="14" y2="10" stroke="#1a1a1a" stroke-width="2" />
-                            <line x1="6" y1="18" x2="10" y2="14" stroke="#1a1a1a" stroke-width="2" />
-                            <line x1="18" y1="18" x2="14" y2="14" stroke="#1a1a1a" stroke-width="2" />
-                            <circle cx="5" cy="5" r="2.8" stroke="#1a1a1a" stroke-width="2" fill="#ffffff" />
-                            <circle cx="19" cy="5" r="2.8" stroke="#1a1a1a" stroke-width="2" fill="#ffffff" />
-                            <circle cx="5" cy="19" r="2.8" stroke="#1a1a1a" stroke-width="2" fill="#ffffff" />
-                            <circle cx="19" cy="19" r="2.8" stroke="#1a1a1a" stroke-width="2" fill="#ffffff" />
-                        </g>
-                    </svg>
-                    <span>Acessar GeoCatalog</span>
-                </a>
-            </div>
+        <button id="moveMode" class="ghost">✋ Mover formas: desligado</button>
+        <button id="showCoords">📋 Ver / extrair coordenadas</button>
+        <button id="check" class="primary">Verificar interseção</button>
+        <div class="row">
+          <button id="exportKML" class="ghost">Exportar KML</button>
+          <button id="exportGeoJSON" class="ghost">Exportar GeoJSON</button>
         </div>
-    </main>
+        <button id="clearPlanos" class="danger">Limpar plano de voo</button>
+        <div id="statusPlanos" class="status"></div>
+      </div>
+    </div>
 
-    <footer>
-        &copy; LabDrones &mdash; Todos os direitos reservados.
-    </footer>
+    <!-- ------------------------------------------------- GRADE DE VOO (FOTOGRAMETRIA) -->
+    <div class="group">
+      <h2 class="accordion-header collapsed" data-target="acc-grade">Grade de voo automática <span class="chevron">▾</span></h2>
+      <div class="accordion-body" id="acc-grade" hidden>
+        <div class="hint">
+          Gera automaticamente as linhas de voo (padrão vai-e-vem) e os pontos de disparo
+          sobre um polígono/retângulo já existente no plano de voo acima — desenhado, criado a
+          partir de um ponto ou importado de KML.
+        </div>
+
+        <label>Área de interesse (AOI)</label>
+        <select id="gridAoiSelect"></select>
+
+        <label>Modelo de câmera</label>
+        <select id="gridCameraSelect">
+          <option value="phantom4pro">DJI Phantom 4 Pro</option>
+          <option value="mavic2pro">DJI Mavic 2 Pro</option>
+          <option value="mini4pro">DJI Mini 4 Pro</option>
+          <option value="custom">Personalizada...</option>
+        </select>
+        <div class="row">
+          <div><label>Sensor L (mm)</label><input type="number" id="gridSensorW" step="0.1" disabled></div>
+          <div><label>Sensor A (mm)</label><input type="number" id="gridSensorH" step="0.1" disabled></div>
+        </div>
+        <div class="row">
+          <div><label>Focal (mm)</label><input type="number" id="gridFocal" step="0.1" disabled></div>
+          <div><label>Img. L (px)</label><input type="number" id="gridImgW" step="1" disabled></div>
+        </div>
+        <label>Img. Altura (px)</label>
+        <input type="number" id="gridImgH" step="1" disabled>
+
+        <div class="row">
+          <div><label>Altitude (m)</label><input type="number" id="gridAltitude" value="100" min="1" step="1"></div>
+          <div><label>Velocidade (m/s)</label><input type="number" id="gridVelocidade" value="8" min="0.5" step="0.5"></div>
+        </div>
+        <div class="row">
+          <div><label>Sobrep. Frontal (%)</label><input type="number" id="gridOverlapFrontal" value="80" min="0" max="95" step="1"></div>
+          <div><label>Sobrep. Lateral (%)</label><input type="number" id="gridOverlapLateral" value="70" min="0" max="95" step="1"></div>
+        </div>
+
+        <label>Ângulo da grade: <span id="gridAnguloValor">0°</span></label>
+        <input type="range" id="gridAngulo" min="0" max="179" step="1" value="0">
+        <button id="sugerirAngulo" class="ghost">🧭 Sugerir melhor ângulo</button>
+
+        <button id="gerarGrade" class="primary">🛩️ Gerar Grade de Voo</button>
+        <div id="statusGrade" class="status"></div>
+
+        <div class="row">
+          <button id="exportGradeKML" class="ghost">Waypoints (KML)</button>
+          <button id="exportGradeGeoJSON" class="ghost">Waypoints (GeoJSON)</button>
+        </div>
+        <button id="clearGrade" class="danger">Limpar grade de voo</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<button id="toggle-btn" title="Ocultar/Exibir menu">◀</button>
+
+<div id="map"></div>
+
+<div id="coordPanel" hidden>
+  <header>
+    <span>Coordenadas do plano de voo</span>
+    <button id="coordClose" title="Fechar">×</button>
+  </header>
+  <pre id="coordText"></pre>
+  <div class="actions">
+    <button id="coordCopy">Copiar</button>
+    <button id="coordDownload">Baixar GeoJSON</button>
+  </div>
+</div>
+
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet.draw/1.0.4/leaflet.draw.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/leaflet-path-drag@1.9.5/dist/index.js"></script>
+<script src="https://unpkg.com/@tmcw/togeojson@6.0.0/dist/togeojson.umd.js"></script>
+<script src="https://unpkg.com/@turf/turf@6/turf.min.js"></script>
+
+<script>
+////////////////////////////////////////////////////////////////////////////
+// CONFIG
+////////////////////////////////////////////////////////////////////////////
+
+const WFS_URL =
+  "https://opendata.sgb.gov.br/geoserver/ows" +
+  "?service=WFS&version=1.1.0&request=GetFeature" +
+  "&typeName=p3m:vw_ibge_complex_aero" +
+  "&outputFormat=application/json" +
+  "&srsName=EPSG:4326&maxFeatures=5000";
+
+const BUFFER_COLORS = ["#e53935", "#fdd835", "#43a047"];
+const DEFAULT_BUFFER_DIST = [50, 80, 100];
+
+const NAME_FIELDS = ["nome","name","nm_aero","ds_aero","designacao","complexo","sigla","icao","id"];
+const VOO_FIELDS  = { id:"Voo_ID", platform:"Platform", mission:"Mission", datetime:"Datetime" };
+const PLANO_COLOR = "#00838f";
+
+const M_PER_DEG_LAT = 111320;
+const mPerDegLon = lat => 111320 * Math.cos(lat * Math.PI / 180);
+
+function setStatus(id, msg) { document.getElementById(id).textContent = msg; }
+
+////////////////////////////////////////////////////////////////////////////
+// MAP + BASE LAYERS (troca pelo botão de camadas, canto sup. direito)
+////////////////////////////////////////////////////////////////////////////
+
+const map = L.map("map", { zoomControl:false }).setView([-23.21, -45.86], 13);
+L.control.zoom({ position:"bottomleft" }).addTo(map);
+
+// Mapa de ruas via Esri (mesmo provedor do satélite abaixo): tile.openstreetmap.org
+// bloqueia sites publicados fora da política de uso da OSM, e os tiles "gratuitos"
+// da CARTO agora exigem API key (respondem 200 mas com um aviso "API KEY REQUIRED").
+// O serviço World_Street_Map da Esri é gratuito, não exige chave e é o mesmo domínio
+// já usado para a camada de satélite (World_Imagery) no GeoCatalog.
+const osm = L.tileLayer("https://server.arcgisonline.com/ArcGIS/rest/services/World_Street_Map/MapServer/tile/{z}/{y}/{x}", {
+  maxZoom:19,
+  attribution:"Tiles &copy; Esri &mdash; Esri, HERE, Garmin, © OpenStreetMap contributors, and the GIS user community"
+});
+
+// Fundo padrão: satélite (Google) — troca pelo botão de camadas no canto sup. direito
+const sat = L.tileLayer("https://mt1.google.com/vt/lyrs=s&x={x}&y={y}&z={z}", {
+  maxZoom:20, attribution:"Imagery &copy; Google"
+}).addTo(map);
+
+L.control.layers(
+  { "Mapa (ruas)": osm, "Satélite (Google)": sat },
+  null,
+  { position:"topright", collapsed:true }
+).addTo(map);
+
+////////////////////////////////////////////////////////////////////////////
+// SIDEBAR: TABS + TOGGLE (mobile friendly)
+////////////////////////////////////////////////////////////////////////////
+
+const sidebar   = document.getElementById("sidebar");
+const toggleBtn = document.getElementById("toggle-btn");
+
+function setSidebar(collapsed) {
+  sidebar.classList.toggle("collapsed", collapsed);
+  toggleBtn.textContent = collapsed ? "▶" : "◀";
+  setTimeout(() => map.invalidateSize(), 320);
+}
+toggleBtn.addEventListener("click", () => setSidebar(!sidebar.classList.contains("collapsed")));
+if (window.innerWidth <= 768) setSidebar(true);
+
+document.querySelectorAll(".tab").forEach(t => {
+  t.addEventListener("click", () => {
+    document.querySelectorAll(".tab").forEach(x => x.classList.toggle("active", x === t));
+    document.querySelectorAll(".tabpane").forEach(p => p.hidden = (p.id !== "tab-" + t.dataset.tab));
+  });
+});
+
+// Seções recolhíveis (acordeão) dentro de uma aba, ex: "Planejar Voo"
+document.querySelectorAll(".accordion-header").forEach(h => {
+  h.addEventListener("click", () => {
+    const body = document.getElementById(h.dataset.target);
+    body.hidden = !body.hidden;
+    h.classList.toggle("collapsed", body.hidden);
+  });
+});
+
+////////////////////////////////////////////////////////////////////////////
+// LAYER GROUPS
+////////////////////////////////////////////////////////////////////////////
+
+function getAirportName(feature) {
+  const p = feature.properties || {};
+  for (const k of NAME_FIELDS) if (p[k]) return String(p[k]);
+  return "Aeroporto";
+}
+
+const aeroportos = L.geoJSON(null, {
+  style:{ color:"#1565c0", weight:2, fillOpacity:0.15 },
+  pointToLayer:(f,ll) => L.circleMarker(ll, { radius:6, color:"#1565c0", fillOpacity:0.6 }),
+  onEachFeature:(f,layer) => layer.bindPopup(getAirportName(f))
+}).addTo(map);
+
+const bufferGroup  = L.featureGroup().addTo(map);
+const bufferLayers = BUFFER_COLORS.map(color => {
+  const lyr = L.geoJSON(null, { style:{ color, weight:1, fillColor:color, fillOpacity:0.22 } });
+  bufferGroup.addLayer(lyr);
+  return lyr;
+});
+
+let voosData = null;
+const voos = L.geoJSON(null, {
+  style:{ color:"#8e24aa", weight:1, fillColor:"#8e24aa", fillOpacity:0.25 },
+  onEachFeature:(f,layer) => {
+    const p = f.properties || {};
+    layer.bindPopup(
+      `<b>${p[VOO_FIELDS.id] || "Voo"}</b><br>` +
+      `Plataforma: ${p[VOO_FIELDS.platform] || "-"}<br>` +
+      `Missão: ${p[VOO_FIELDS.mission] || "-"}<br>` +
+      `Data: ${(p[VOO_FIELDS.datetime] || "").slice(0,10)}`
+    );
+  }
+}).addTo(map);
+
+const planos = new L.FeatureGroup().addTo(map);
+
+////////////////////////////////////////////////////////////////////////////
+// MANAGED GROUPS  (master on/off  +  per-item on/off  in the "Visualização" tab)
+////////////////////////////////////////////////////////////////////////////
+
+function describePlano(layer) {
+  if (layer.__name) return layer.__name;
+  if (layer instanceof L.Rectangle) return "Retângulo";
+  if (layer instanceof L.Polygon)   return "Polígono (" + layer.getLatLngs()[0].length + " pts)";
+  if (layer instanceof L.Polyline)  return "Rota (" + layer.getLatLngs().length + " pts)";
+  if (layer instanceof L.Marker || layer instanceof L.CircleMarker) return "Ponto";
+  return "Forma";
+}
+
+function ManagedGroup(group, nameFn) {
+  this.group = group;
+  this.nameFn = nameFn;
+  this.entries = [];
+}
+ManagedGroup.prototype.rescan = function () {
+  const self = this;
+  this.entries = [];
+  this.group.eachLayer(l => self.entries.push({ layer:l, name:self.nameFn(l), visible:true }));
+  renderViz();
+};
+ManagedGroup.prototype.addOne = function (layer) {
+  this.group.addLayer(layer);
+  this.entries.push({ layer:layer, name:this.nameFn(layer), visible:true });
+  renderViz();
+};
+ManagedGroup.prototype.setVisible = function (entry, vis) {
+  if (!entry || entry.visible === vis) return;
+  entry.visible = vis;
+  if (vis) this.group.addLayer(entry.layer); else this.group.removeLayer(entry.layer);
+};
+ManagedGroup.prototype.clear = function () {
+  this.group.clearLayers();
+  this.entries = [];
+  renderViz();
+};
+ManagedGroup.prototype.removeOne = function (layer) {
+  this.group.removeLayer(layer);
+  this.entries = this.entries.filter(e => e.layer !== layer);
+  renderViz();
+};
+
+const planosMG = new ManagedGroup(planos, describePlano);
+const voosMG   = new ManagedGroup(voos, l =>
+  (l.feature && l.feature.properties && l.feature.properties[VOO_FIELDS.id]) || "Voo");
+const aeroMG   = new ManagedGroup(aeroportos, l => l.feature ? getAirportName(l.feature) : "Aeroporto");
+
+// Buffers behave a bit differently: the three "items" are the distance levels.
+const buffersMG = {
+  group: bufferGroup,
+  entries: bufferLayers.map((l, i) => ({ layer:l, idx:i, visible:true })),
+  setVisible(entry, vis) {
+    if (entry.visible === vis) return;
+    entry.visible = vis;
+    if (vis) bufferGroup.addLayer(entry.layer); else bufferGroup.removeLayer(entry.layer);
+  },
+  clear() { bufferLayers.forEach(l => l.clearLayers()); renderViz(); },
+  childName(entry) { return bufferDistances()[entry.idx] + " m (" + entry.layer.getLayers().length + ")"; }
+};
+
+const VIZ = [
+  { key:"planos",  mg:planosMG,  label:"Plano de voo",        color:"#00838f", open:true },
+  { key:"voos",    mg:voosMG,    label:"Voos anteriores",     color:"#8e24aa", open:false },
+  { key:"aero",    mg:aeroMG,    label:"Aeroportos",          color:"#1565c0", open:false },
+  { key:"buffers", mg:buffersMG, label:"Zonas de restrição",  color:"#e53935", open:false, buffers:true }
+];
+
+const vizEl = document.getElementById("vizLayers");
+
+function renderViz() {
+  vizEl.innerHTML = "";
+
+  VIZ.forEach(cfg => {
+    const mg = cfg.mg;
+    const grp = document.createElement("div");
+    grp.className = "viz-group";
+
+    const master = document.createElement("div");
+    master.className = "viz-row viz-master";
+    master.innerHTML =
+      `<input type="checkbox" class="v-master" ${map.hasLayer(mg.group) ? "checked" : ""}>` +
+      `<span class="swatch" style="background:${cfg.color}"></span>` +
+      `<span class="v-name">${cfg.label}</span>` +
+      `<span class="v-count">${mg.entries.length}</span>` +
+      `<button class="v-expand" title="Expandir/recolher">${cfg.open ? "▾" : "▸"}</button>` +
+      `<button class="trash" title="Remover dados desta camada">🗑</button>`;
+    grp.appendChild(master);
+
+    const kids = document.createElement("div");
+    kids.className = "viz-children";
+    kids.hidden = !cfg.open;
+
+    if (!mg.entries.length) {
+      const empty = document.createElement("div");
+      empty.className = "viz-row viz-child";
+      empty.style.opacity = ".55";
+      empty.textContent = "— vazio —";
+      kids.appendChild(empty);
+    } else {
+      mg.entries.forEach((entry, i) => {
+        const lab = document.createElement("label");
+        lab.className = "viz-row viz-child";
+        const nm = cfg.buffers ? mg.childName(entry) : entry.name;
+        lab.innerHTML =
+          `<input type="checkbox" class="v-item" data-i="${i}" ${entry.visible ? "checked" : ""}>` +
+          `<span title="${nm}">${nm}</span>`;
+        kids.appendChild(lab);
+      });
+    }
+    grp.appendChild(kids);
+
+    master.querySelector(".v-master").addEventListener("change", function () {
+      if (this.checked) map.addLayer(mg.group); else map.removeLayer(mg.group);
+    });
+    master.querySelector(".v-expand").addEventListener("click", () => { cfg.open = !cfg.open; renderViz(); });
+    master.querySelector(".trash").addEventListener("click", () => {
+      if (cfg.key === "aero") { aeroMG.clear(); buffersMG.clear(); setStatus("statusAeroportos", "Aeroportos e zonas removidos."); }
+      else if (cfg.key === "voos") {
+        voosMG.clear(); voosData = null;
+        document.getElementById("filterAno").innerHTML = "";
+        document.getElementById("filterPlatform").innerHTML = "";
+        setStatus("statusVoos", "Voos anteriores removidos.");
+      }
+      else if (cfg.key === "buffers") { buffersMG.clear(); setStatus("statusAeroportos", "Zonas de restrição removidas."); }
+      else { planosMG.clear(); setStatus("statusPlanos", "Plano de voo removido."); }
+    });
+    kids.querySelectorAll(".v-item").forEach(cb => {
+      cb.addEventListener("change", function () {
+        mg.setVisible(mg.entries[+this.dataset.i], this.checked);
+      });
+    });
+
+    vizEl.appendChild(grp);
+  });
+
+  refreshGridAoiOptions();
+}
+
+////////////////////////////////////////////////////////////////////////////
+// DRAW CONTROL  (shapes created draggable so they can be moved later)
+////////////////////////////////////////////////////////////////////////////
+
+const drawControl = new L.Control.Draw({
+  position:"topright",
+  draw:{
+    polyline : { shapeOptions:{ color:PLANO_COLOR, weight:4, draggable:true } },
+    polygon  : { shapeOptions:{ color:PLANO_COLOR, draggable:true } },
+    rectangle: { shapeOptions:{ color:PLANO_COLOR, draggable:true } },
+    circle:false, marker:false, circlemarker:false
+  },
+  edit:{ featureGroup:planos }
+});
+map.addControl(drawControl);
+
+map.on(L.Draw.Event.CREATED, e => registerPlano(e.layer));
+
+////////////////////////////////////////////////////////////////////////////
+// MOVE MODE  (drag whole shapes for small adjustments)
+////////////////////////////////////////////////////////////////////////////
+
+let moveModeOn = false;
+let moveCtrlBtn = null;                       // the twin button on the map (right side)
+const moveBtn = document.getElementById("moveMode");
+
+function applyMoveState(layer) {
+  if (!layer.dragging) return;
+  if (moveModeOn) layer.dragging.enable(); else layer.dragging.disable();
+}
+
+function registerPlano(layer, name) {
+  if (name) layer.__name = name;
+  planosMG.addOne(layer);
+  bindCoordPopup(layer);
+  applyMoveState(layer);
+}
+
+function setMoveMode(on) {
+  moveModeOn = on;
+  moveBtn.classList.toggle("active", on);
+  moveBtn.textContent = on ? "✋ Mover formas: LIGADO" : "✋ Mover formas: desligado";
+  if (moveCtrlBtn) moveCtrlBtn.classList.toggle("active", on);
+  planosMG.entries.forEach(e => applyMoveState(e.layer));
+  setStatus("statusPlanos", on
+    ? "Arraste qualquer forma (a área inteira) para reposicionar."
+    : "Modo mover desligado.");
+}
+function toggleMoveMode() { setMoveMode(!moveModeOn); }
+moveBtn.addEventListener("click", toggleMoveMode);
+
+// Twin controls on the map's right side: move shapes + view coordinates
+const ShapeToolsControl = L.Control.extend({
+  options:{ position:"topright" },
+  onAdd() {
+    const bar = L.DomUtil.create("div", "leaflet-bar shape-tools");
+    const mk = (html, title, fn) => {
+      const a = L.DomUtil.create("a", "", bar);
+      a.href = "#"; a.title = title; a.innerHTML = html; a.setAttribute("role", "button");
+      L.DomEvent.on(a, "click", L.DomEvent.stop).on(a, "click", fn);
+      return a;
+    };
+    moveCtrlBtn = mk("✋", "Mover formas (arrastar a área inteira)", toggleMoveMode);
+    mk("📋", "Ver / extrair coordenadas", () => openCoordPanel());
+    return bar;
+  }
+});
+map.addControl(new ShapeToolsControl());
+
+////////////////////////////////////////////////////////////////////////////
+// COORDINATE POPUP PER SHAPE
+////////////////////////////////////////////////////////////////////////////
+
+function coordsOfLayer(layer) {
+  const g = layer.toGeoJSON().geometry;
+  if (g.type === "LineString") return g.coordinates;
+  if (g.type === "Polygon")    return g.coordinates[0];
+  if (g.type === "Point")      return [g.coordinates];
+  return [];
+}
+
+function bindCoordPopup(layer) {
+  if (typeof layer.getLatLngs !== "function") return; // only polylines / polygons
+  layer.bindPopup(() => {
+    const pts = coordsOfLayer(layer);
+    const list = pts.map(c => `${c[1].toFixed(6)}, ${c[0].toFixed(6)}`).join("<br>");
+    return `<div style="font-size:12px;max-height:180px;overflow:auto">
+      <b>${describePlano(layer)}</b><br>${pts.length} vértice(s) (lat, lon)<br>${list}
+      <br><br><button onclick="openCoordPanel()" style="cursor:pointer">Abrir painel completo</button>
+    </div>`;
+  });
+}
+
+////////////////////////////////////////////////////////////////////////////
+// AIRPORT RESTRICTION ZONES  (circular OR rectangular, editable distances)
+////////////////////////////////////////////////////////////////////////////
+
+function bufferDistances() {
+  return [0,1,2].map(i => {
+    const v = parseFloat(document.getElementById("buf" + i).value);
+    return v > 0 ? v : DEFAULT_BUFFER_DIST[i];
+  });
+}
+
+function updateBufferLegend() {
+  bufferDistances().forEach((d,i) => document.getElementById("lg" + i).textContent = d + " m");
+}
+["buf0","buf1","buf2"].forEach(id =>
+  document.getElementById(id).addEventListener("input", () => { updateBufferLegend(); renderViz(); }));
+updateBufferLegend();
+
+function rectZone(feature, dist) {
+  const b = turf.bbox(feature);
+  const cLat = (b[1] + b[3]) / 2;
+  const dLon = dist / mPerDegLon(cLat);
+  const dLat = dist / M_PER_DEG_LAT;
+  const minX = b[0] - dLon, maxX = b[2] + dLon;
+  const minY = b[1] - dLat, maxY = b[3] + dLat;
+  return turf.polygon([[[minX,minY],[maxX,minY],[maxX,maxY],[minX,maxY],[minX,minY]]],
+    feature.properties || {});
+}
+
+function circleZone(feature, dist) {
+  const b = turf.bbox(feature);
+  const cLon = (b[0] + b[2]) / 2, cLat = (b[1] + b[3]) / 2;
+  const halfW = ((b[2] - b[0]) / 2) * mPerDegLon(cLat);
+  const halfH = ((b[3] - b[1]) / 2) * M_PER_DEG_LAT;
+  const radiusM = Math.max(halfW, halfH, 0) + dist;
+  return turf.circle([cLon, cLat], radiusM / 1000, { steps:96, units:"kilometers", properties:feature.properties || {} });
+}
+
+function rebuildBuffers() {
+  const shape = document.getElementById("bufferShape").value;
+  const dists = bufferDistances();
+  bufferLayers.forEach(l => l.clearLayers());
+  aeroportos.eachLayer(layer => {
+    const feature = layer.toGeoJSON();
+    dists.forEach((dist,i) => {
+      const zone = shape === "circular" ? circleZone(feature, dist) : rectZone(feature, dist);
+      bufferLayers[i].addData(zone);
+    });
+  });
+  renderViz();
+}
+
+document.getElementById("applyBuffers").addEventListener("click", () => {
+  rebuildBuffers();
+  setStatus("statusAeroportos", "Zonas de restrição atualizadas.");
+});
+document.getElementById("bufferShape").addEventListener("change", rebuildBuffers);
+
+////////////////////////////////////////////////////////////////////////////
+// LOAD AIRPORTS
+////////////////////////////////////////////////////////////////////////////
+
+document.getElementById("loadWFS").addEventListener("click", async () => {
+  setStatus("statusAeroportos", "Carregando aeroportos (WFS)...");
+  try {
+    const res = await fetch(WFS_URL);
+    if (!res.ok) throw new Error("HTTP " + res.status);
+    const json = await res.json();
+    aeroportos.clearLayers();
+    aeroportos.addData(json);
+    aeroMG.rescan();
+    rebuildBuffers();
+    const n = (json.features || []).length;
+    setStatus("statusAeroportos", n + " aeroporto(s) carregado(s).");
+    if (n > 0) map.fitBounds(aeroportos.getBounds());
+  } catch (err) {
+    console.error(err);
+    setStatus("statusAeroportos", "Falha ao consultar o WFS (verifique CORS/conexão).");
+  }
+});
+
+document.getElementById("uploadAeroporto").addEventListener("change", function (e) {
+  const file = e.target.files[0];
+  if (!file) return;
+  const isKML = /\.kml$/i.test(file.name);
+  const reader = new FileReader();
+  reader.onload = evt => {
+    try {
+      const geojson = isKML
+        ? toGeoJSON.kml(new DOMParser().parseFromString(evt.target.result, "text/xml"))
+        : JSON.parse(evt.target.result);
+      aeroportos.addData(geojson);
+      aeroMG.rescan();
+      rebuildBuffers();
+      map.fitBounds(aeroportos.getBounds());
+      setStatus("statusAeroportos", "Geometria de aeroporto adicionada.");
+    } catch (err) {
+      console.error(err);
+      setStatus("statusAeroportos", "Não foi possível ler o arquivo enviado.");
+    }
+  };
+  reader.readAsText(file);
+  e.target.value = "";
+});
+
+////////////////////////////////////////////////////////////////////////////
+// PREVIOUS FLIGHTS
+////////////////////////////////////////////////////////////////////////////
+
+const DEFAULT_VOOS_URL = "../geocatalog/data/voos_labdrones.geojson";
+
+function carregarVoosPadrao() {
+  setStatus("statusVoos", "Carregando voos anteriores...");
+  fetch(DEFAULT_VOOS_URL)
+    .then(res => {
+      if (!res.ok) throw new Error("HTTP " + res.status);
+      return res.json();
+    })
+    .then(data => {
+      voosData = data;
+      populateVooFilters(voosData.features || []);
+      applyVooFilter();
+      setStatus("statusVoos", (voosData.features || []).length + " voo(s) carregados automaticamente do banco INPE.");
+    })
+    .catch(err => {
+      console.warn("Não foi possível carregar o banco de voos padrão:", err);
+      setStatus("statusVoos", "Banco de voos padrão indisponível — envie um GeoJSON manualmente.");
+    });
+}
+document.getElementById("reloadVoosPadrao").addEventListener("click", carregarVoosPadrao);
+
+function fillSelect(select, values) {
+  select.innerHTML = "";
+  values.forEach(v => {
+    const opt = document.createElement("option");
+    opt.value = v; opt.textContent = v; opt.selected = true;
+    select.appendChild(opt);
+  });
+}
+
+function populateVooFilters(features) {
+  const anos = new Set(), plats = new Set();
+  features.forEach(f => {
+    const p = f.properties || {};
+    const ano = (p[VOO_FIELDS.datetime] || "").slice(0,4);
+    if (ano) anos.add(ano);
+    if (p[VOO_FIELDS.platform]) plats.add(p[VOO_FIELDS.platform]);
+  });
+  fillSelect(document.getElementById("filterAno"), [...anos].sort());
+  fillSelect(document.getElementById("filterPlatform"), [...plats].sort());
+}
+
+function applyVooFilter() {
+  if (!voosData) return;
+  const anosSel = [...document.getElementById("filterAno").selectedOptions].map(o => o.value);
+  const platSel = [...document.getElementById("filterPlatform").selectedOptions].map(o => o.value);
+  const filtered = voosData.features.filter(f => {
+    const p = f.properties || {};
+    const ano = (p[VOO_FIELDS.datetime] || "").slice(0,4);
+    return (!anosSel.length || anosSel.includes(ano)) &&
+           (!platSel.length || platSel.includes(p[VOO_FIELDS.platform]));
+  });
+  voos.clearLayers();
+  voos.addData({ type:"FeatureCollection", features:filtered });
+  voosMG.rescan();
+  setStatus("statusVoos", filtered.length + " de " + voosData.features.length + " voo(s) exibido(s).");
+}
+
+document.getElementById("uploadVoos").addEventListener("change", function (e) {
+  const file = e.target.files[0];
+  if (!file) return;
+  const reader = new FileReader();
+  reader.onload = evt => {
+    try {
+      voosData = JSON.parse(evt.target.result);
+      populateVooFilters(voosData.features || []);
+      applyVooFilter();
+      if (voos.getLayers().length) map.fitBounds(voos.getBounds());
+    } catch (err) {
+      console.error(err);
+      setStatus("statusVoos", "Não foi possível ler o GeoJSON enviado.");
+    }
+  };
+  reader.readAsText(file);
+  e.target.value = "";
+});
+
+document.getElementById("applyFilterVoos").addEventListener("click", applyVooFilter);
+
+////////////////////////////////////////////////////////////////////////////
+// AREA FROM A POINT  (circle / rectangle with width & height, no center marker)
+////////////////////////////////////////////////////////////////////////////
+
+const areaShapeEl = document.getElementById("areaShape");
+const pickBtn     = document.getElementById("pickPoint");
+let pickingPoint  = false;
+
+areaShapeEl.addEventListener("change", () => {
+  const rect = areaShapeEl.value === "rect";
+  document.getElementById("areaRectFields").hidden   = !rect;
+  document.getElementById("areaCircleFields").hidden = rect;
+});
+
+function setPicking(on) {
+  pickingPoint = on;
+  pickBtn.classList.toggle("active", on);
+  pickBtn.textContent = on ? "Clique no mapa… (cancelar)" : "Selecionar ponto no mapa";
+  map.getContainer().style.cursor = on ? "crosshair" : "";
+}
+pickBtn.addEventListener("click", () => {
+  setPicking(!pickingPoint);
+  setStatus("statusArea", pickingPoint ? "Clique no mapa para definir o centro da área." : "");
+});
+
+function rectAroundPoint(lon, lat, widthM, heightM) {
+  const dLon = (widthM  / 2) / mPerDegLon(lat);
+  const dLat = (heightM / 2) / M_PER_DEG_LAT;
+  return turf.polygon([[
+    [lon - dLon, lat - dLat], [lon + dLon, lat - dLat],
+    [lon + dLon, lat + dLat], [lon - dLon, lat + dLat],
+    [lon - dLon, lat - dLat]
+  ]]);
+}
+
+map.on("click", e => {
+  if (!pickingPoint) return;
+  const lon = e.latlng.lng, lat = e.latlng.lat;
+  let poly, name;
+
+  if (areaShapeEl.value === "circle") {
+    const r = parseFloat(document.getElementById("areaRadius").value);
+    if (!(r > 0)) return setStatus("statusArea", "Informe um raio válido (m).");
+    poly = turf.circle([lon, lat], r / 1000, { steps:128, units:"kilometers" });
+    name = "Círculo r=" + r + " m";
+  } else {
+    const w = parseFloat(document.getElementById("areaWidth").value);
+    const h = parseFloat(document.getElementById("areaHeight").value);
+    if (!(w > 0) || !(h > 0)) return setStatus("statusArea", "Informe largura e altura válidas (m).");
+    poly = rectAroundPoint(lon, lat, w, h);
+    name = "Retângulo " + w + "×" + h + " m";
+  }
+
+  const shape = L.polygon(
+    poly.geometry.coordinates[0].map(c => [c[1], c[0]]),
+    { color:PLANO_COLOR, weight:3, fillOpacity:0.1, draggable:true }
+  );
+  registerPlano(shape, name);
+
+  setPicking(false);
+  setStatus("statusArea", `Área criada (${name}). Ligue "Mover formas" para arrastá-la e ajustar.`);
+});
+
+////////////////////////////////////////////////////////////////////////////
+// IMPORT KML  (rebuilt as draggable layers)
+////////////////////////////////////////////////////////////////////////////
+
+document.getElementById("uploadKML").addEventListener("change", function (e) {
+  const file = e.target.files[0];
+  if (!file) return;
+  const reader = new FileReader();
+  reader.onload = evt => {
+    try {
+      const xml = new DOMParser().parseFromString(evt.target.result, "text/xml");
+      const geojson = toGeoJSON.kml(xml);
+      L.geoJSON(geojson).eachLayer(layer => {
+        const g = layer.toGeoJSON().geometry;
+        let rebuilt = null;
+        if (g.type === "LineString")
+          rebuilt = L.polyline(g.coordinates.map(c => [c[1], c[0]]),
+            { color:PLANO_COLOR, weight:4, draggable:true });
+        else if (g.type === "Polygon")
+          rebuilt = L.polygon(g.coordinates[0].map(c => [c[1], c[0]]),
+            { color:PLANO_COLOR, draggable:true });
+        else if (g.type === "Point")
+          rebuilt = L.marker([g.coordinates[1], g.coordinates[0]]);
+        if (rebuilt) registerPlano(rebuilt);
+      });
+      if (planos.getLayers().length) map.fitBounds(planos.getBounds());
+      setStatus("statusPlanos", "Plano de voo importado.");
+    } catch (err) {
+      console.error(err);
+      setStatus("statusPlanos", "Não foi possível ler o KML enviado.");
+    }
+  };
+  reader.readAsText(file);
+  e.target.value = "";
+});
+
+document.getElementById("clearPlanos").addEventListener("click", () => {
+  planosMG.clear();
+  setStatus("statusPlanos", "Plano de voo removido.");
+});
+
+////////////////////////////////////////////////////////////////////////////
+// GRADE DE VOO AUTOMÁTICA (fotogrametria: grid boustrophedon + waypoints)
+////////////////////////////////////////////////////////////////////////////
+
+const PRESETS_CAMERA = {
+  phantom4pro: { sensorW:13.2, sensorH:8.8,  focal:8.8,   imgW:5472, imgH:3648 },
+  mavic2pro:   { sensorW:13.2, sensorH:8.8,  focal:10.26, imgW:5472, imgH:3648 },
+  mini4pro:    { sensorW:9.7,  sensorH:7.3,  focal:6.7,   imgW:4032, imgH:3024 },
+  custom:      { sensorW:13.2, sensorH:8.8,  focal:8.8,   imgW:5472, imgH:3648 }
+};
+
+let gradeAtual = null;        // { linhaLatLng, waypoints, stats }
+let gradeLineLayer = null;    // polilinha registrada em planosMG (participa de Visualização/exportação)
+const gradeWaypointsLayer = L.layerGroup(); // apenas visual (não gerenciado), com limite de marcadores
+
+// --- Câmera: presets x campos personalizados ---
+function trocarPresetCameraGrade() {
+  const chave = document.getElementById("gridCameraSelect").value;
+  const preset = PRESETS_CAMERA[chave];
+  const personalizado = chave === "custom";
+
+  document.getElementById("gridSensorW").value = preset.sensorW;
+  document.getElementById("gridSensorH").value = preset.sensorH;
+  document.getElementById("gridFocal").value = preset.focal;
+  document.getElementById("gridImgW").value = preset.imgW;
+  document.getElementById("gridImgH").value = preset.imgH;
+
+  ["gridSensorW","gridSensorH","gridFocal","gridImgW","gridImgH"].forEach(id => {
+    document.getElementById(id).disabled = !personalizado;
+  });
+}
+document.getElementById("gridCameraSelect").addEventListener("change", trocarPresetCameraGrade);
+trocarPresetCameraGrade();
+
+document.getElementById("gridAngulo").addEventListener("input", e => {
+  document.getElementById("gridAnguloValor").textContent = e.target.value + "°";
+});
+
+// --- Seleção da AOI: lista os polígonos/retângulos já existentes no plano de voo ---
+function refreshGridAoiOptions() {
+  const select = document.getElementById("gridAoiSelect");
+  if (!select) return; // ainda não renderizado (primeira chamada, durante o load)
+  const valorAnterior = select.value;
+
+  const candidatos = planosMG.entries.filter(e => e.layer instanceof L.Polygon);
+  select.innerHTML = "";
+  if (!candidatos.length) {
+    const opt = document.createElement("option");
+    opt.value = "";
+    opt.textContent = "— nenhuma área disponível —";
+    select.appendChild(opt);
+    select.disabled = true;
+    return;
+  }
+  select.disabled = false;
+  candidatos.forEach((entry) => {
+    const idx = planosMG.entries.indexOf(entry);
+    const opt = document.createElement("option");
+    opt.value = String(idx);
+    opt.textContent = `#${idx + 1} ${entry.name}`;
+    select.appendChild(opt);
+  });
+  // mantém a seleção anterior quando ainda existir; senão usa a área mais recente
+  if ([...select.options].some(o => o.value === valorAnterior)) {
+    select.value = valorAnterior;
+  } else {
+    select.value = select.options[select.options.length - 1].value;
+  }
+}
+
+function getAoiSelecionada() {
+  const select = document.getElementById("gridAoiSelect");
+  const idx = parseInt(select.value, 10);
+  const entry = planosMG.entries[idx];
+  if (!entry) return null;
+  let latlngs = entry.layer.getLatLngs();
+  while (Array.isArray(latlngs[0])) latlngs = latlngs[0]; // desconsidera anéis internos (buracos)
+  return latlngs.map(p => [p.lat, p.lng]);
+}
+
+// --- Geometria auxiliar: projeção local em metros (equirretangular, válida para áreas pequenas) ---
+function projetarMetros(lat, lng, latRef) {
+  return [lng * mPerDegLon(latRef), lat * M_PER_DEG_LAT];
+}
+function projetarLatLng(x, y, latRef) {
+  return [y / M_PER_DEG_LAT, x / mPerDegLon(latRef)];
+}
+function rotacionarPonto(x, y, anguloGraus) {
+  const r = anguloGraus * Math.PI / 180;
+  return [x * Math.cos(r) - y * Math.sin(r), x * Math.sin(r) + y * Math.cos(r)];
+}
+function distanciaMetrosLL(p1, p2) {
+  const latRef = (p1[0] + p2[0]) / 2;
+  const [x1, y1] = projetarMetros(p1[0], p1[1], latRef);
+  const [x2, y2] = projetarMetros(p2[0], p2[1], latRef);
+  return Math.hypot(x2 - x1, y2 - y1);
+}
+
+// Sugere o ângulo alinhado com a maior aresta da AOI (reduz manobras de curva)
+function sugerirMelhorAnguloGrade() {
+  const aoi = getAoiSelecionada();
+  if (!aoi) return setStatus("statusGrade", "Selecione uma área de interesse primeiro.");
+
+  const latRef = aoi.reduce((s, p) => s + p[0], 0) / aoi.length;
+  const ptsM = aoi.map(p => projetarMetros(p[0], p[1], latRef));
+
+  let maiorComprimento = -1, melhorAngulo = 0;
+  for (let i = 0; i < ptsM.length; i++) {
+    const [x1, y1] = ptsM[i];
+    const [x2, y2] = ptsM[(i + 1) % ptsM.length];
+    const comprimento = Math.hypot(x2 - x1, y2 - y1);
+    if (comprimento > maiorComprimento) {
+      maiorComprimento = comprimento;
+      melhorAngulo = ((Math.atan2(y2 - y1, x2 - x1) * 180 / Math.PI) % 180 + 180) % 180;
+    }
+  }
+  const slider = document.getElementById("gridAngulo");
+  slider.value = Math.round(melhorAngulo);
+  document.getElementById("gridAnguloValor").textContent = slider.value + "°";
+}
+document.getElementById("sugerirAngulo").addEventListener("click", sugerirMelhorAnguloGrade);
+
+// --- Geração da grade (padrão boustrophedon / vai-e-vem) ---
+function gerarGradeDeVoo() {
+  const aoi = getAoiSelecionada();
+  if (!aoi || aoi.length < 3) {
+    return setStatus("statusGrade", "Nenhuma área de interesse selecionada — desenhe, crie a partir de um ponto ou importe um KML na seção 'Plano de voo' primeiro.");
+  }
+
+  const altitude = parseFloat(document.getElementById("gridAltitude").value);
+  const velocidade = parseFloat(document.getElementById("gridVelocidade").value);
+  const overlapFrontal = parseFloat(document.getElementById("gridOverlapFrontal").value);
+  const overlapLateral = parseFloat(document.getElementById("gridOverlapLateral").value);
+  const angulo = parseFloat(document.getElementById("gridAngulo").value);
+  const sensorW = parseFloat(document.getElementById("gridSensorW").value);
+  const sensorH = parseFloat(document.getElementById("gridSensorH").value);
+  const focal = parseFloat(document.getElementById("gridFocal").value);
+  const imgW = parseFloat(document.getElementById("gridImgW").value);
+  const imgH = parseFloat(document.getElementById("gridImgH").value);
+
+  if ([altitude, velocidade, overlapFrontal, overlapLateral, sensorW, sensorH, focal, imgW, imgH].some(v => isNaN(v) || v <= 0)) {
+    return setStatus("statusGrade", "Verifique os parâmetros — todos os campos devem ser números positivos.");
+  }
+
+  const gsdX = (sensorW / imgW) * altitude / focal; // m/px, transversal ao voo
+  const gsdY = (sensorH / imgH) * altitude / focal; // m/px, na direção do voo
+  const footprintCross = gsdX * imgW;
+  const footprintAlong = gsdY * imgH;
+  const espacamentoLinhas = footprintCross * (1 - overlapLateral / 100);
+  const intervaloFotos = footprintAlong * (1 - overlapFrontal / 100);
+
+  if (espacamentoLinhas < 0.5 || intervaloFotos < 0.5) {
+    return setStatus("statusGrade", "Sobreposição alta demais para a altitude/câmera informadas.");
+  }
+
+  const latRef = aoi.reduce((s, p) => s + p[0], 0) / aoi.length;
+  const ptsOriginais = aoi.map(p => projetarMetros(p[0], p[1], latRef));
+  const ptsRot = ptsOriginais.map(([x, y]) => rotacionarPonto(x, y, -angulo));
+
+  const minY = Math.min(...ptsRot.map(p => p[1]));
+  const maxY = Math.max(...ptsRot.map(p => p[1]));
+
+  // Varredura (scanline): para cada linha, encontra os segmentos internos ao polígono (regra par-ímpar)
+  const linhas = [];
+  for (let y = minY + espacamentoLinhas / 2; y <= maxY; y += espacamentoLinhas) {
+    const intersecoesX = [];
+    for (let i = 0; i < ptsRot.length; i++) {
+      const [x1, y1] = ptsRot[i];
+      const [x2, y2] = ptsRot[(i + 1) % ptsRot.length];
+      if ((y1 <= y && y2 > y) || (y2 <= y && y1 > y)) {
+        intersecoesX.push(x1 + (y - y1) / (y2 - y1) * (x2 - x1));
+      }
+    }
+    intersecoesX.sort((a, b) => a - b);
+    for (let i = 0; i + 1 < intersecoesX.length; i += 2) {
+      linhas.push([[intersecoesX[i], y], [intersecoesX[i + 1], y]]);
+    }
+  }
+
+  if (!linhas.length) {
+    return setStatus("statusGrade", "Não foi possível gerar linhas — a área pode ser pequena demais para o espaçamento calculado.");
+  }
+
+  const caminhoRot = [];
+  const waypointsRot = [];
+  linhas.forEach((linha, idx) => {
+    const [a, b] = idx % 2 === 0 ? linha : [linha[1], linha[0]];
+    caminhoRot.push(a, b);
+    const comprimento = Math.hypot(b[0] - a[0], b[1] - a[1]);
+    const dirX = (b[0] - a[0]) / comprimento, dirY = (b[1] - a[1]) / comprimento;
+    for (let d = 0; d <= comprimento; d += intervaloFotos) {
+      waypointsRot.push([a[0] + dirX * d, a[1] + dirY * d]);
+    }
+    waypointsRot.push(b);
+  });
+
+  const caminhoLatLng = caminhoRot.map(([x, y]) => {
+    const [xo, yo] = rotacionarPonto(x, y, angulo);
+    return projetarLatLng(xo, yo, latRef);
+  });
+  const waypoints = waypointsRot.map(([x, y]) => {
+    const [xo, yo] = rotacionarPonto(x, y, angulo);
+    return projetarLatLng(xo, yo, latRef);
+  });
+
+  let distanciaTotal = 0;
+  for (let i = 0; i + 1 < caminhoLatLng.length; i++) {
+    distanciaTotal += distanciaMetrosLL(caminhoLatLng[i], caminhoLatLng[i + 1]);
+  }
+  const areaM2 = Math.abs(turf.area(turf.polygon([aoi.map(p => [p[1], p[0]]).concat([[aoi[0][1], aoi[0][0]]])])));
+
+  gradeAtual = {
+    linhaLatLng: caminhoLatLng,
+    waypoints,
+    stats: {
+      gsd: ((gsdX + gsdY) / 2 * 100).toFixed(2),
+      area: (areaM2 / 10000).toFixed(2),
+      numLinhas: linhas.length,
+      espacamentoLinhas: espacamentoLinhas.toFixed(1),
+      intervaloFotos: intervaloFotos.toFixed(1),
+      distancia: (distanciaTotal / 1000).toFixed(2),
+      tempo: ((distanciaTotal / velocidade) / 60).toFixed(1),
+      numFotos: waypoints.length
+    }
+  };
+
+  // Remove a rota anterior (se houver) antes de registrar a nova
+  if (gradeLineLayer) { planosMG.removeOne(gradeLineLayer); gradeLineLayer = null; }
+  gradeLineLayer = L.polyline(caminhoLatLng, { color:"#e74c3c", weight:3, draggable:true });
+  registerPlano(gradeLineLayer, "Rota de voo (grade automática)");
+
+  gradeWaypointsLayer.clearLayers();
+  const LIMITE_MARCADORES = 400;
+  if (waypoints.length <= LIMITE_MARCADORES) {
+    waypoints.forEach(wp => {
+      L.circleMarker(wp, { radius:3, color:"#fff", weight:1, fillColor:"#f39c12", fillOpacity:1 }).addTo(gradeWaypointsLayer);
+    });
+  }
+  if (!map.hasLayer(gradeWaypointsLayer)) gradeWaypointsLayer.addTo(map);
+
+  const s = gradeAtual.stats;
+  setStatus("statusGrade",
+    `Área: ${s.area} ha · GSD: ${s.gsd} cm/px · ${s.numLinhas} linha(s) · ` +
+    `espaç. ${s.espacamentoLinhas} m · fotos a cada ${s.intervaloFotos} m · ` +
+    `${s.distancia} km · ~${s.tempo} min · ${s.numFotos} foto(s).`);
+}
+document.getElementById("gerarGrade").addEventListener("click", gerarGradeDeVoo);
+
+function limparGrade() {
+  if (gradeLineLayer) { planosMG.removeOne(gradeLineLayer); gradeLineLayer = null; }
+  gradeWaypointsLayer.clearLayers();
+  map.removeLayer(gradeWaypointsLayer);
+  gradeAtual = null;
+  setStatus("statusGrade", "Grade de voo removida.");
+}
+document.getElementById("clearGrade").addEventListener("click", limparGrade);
+
+// --- Exportação específica dos waypoints de foto ---
+function exportarWaypointsGeoJSON() {
+  if (!gradeAtual || !gradeAtual.waypoints.length) return alert("Gere a grade de voo antes de exportar.");
+  const fc = {
+    type: "FeatureCollection",
+    features: gradeAtual.waypoints.map((p, i) => ({
+      type: "Feature",
+      properties: { nome: `Foto ${i + 1}`, altitude: document.getElementById("gridAltitude").value },
+      geometry: { type: "Point", coordinates: [p[1], p[0]] }
+    }))
+  };
+  downloadBlob(JSON.stringify(fc, null, 2), "waypoints_fotos.geojson", "application/geo+json");
+}
+document.getElementById("exportGradeGeoJSON").addEventListener("click", exportarWaypointsGeoJSON);
+
+function exportarWaypointsKML() {
+  if (!gradeAtual || !gradeAtual.waypoints.length) return alert("Gere a grade de voo antes de exportar.");
+  const altitude = document.getElementById("gridAltitude").value;
+  const placemarks = gradeAtual.waypoints.map((p, i) => `
+    <Placemark>
+      <name>Foto ${i + 1}</name>
+      <Point><coordinates>${p[1]},${p[0]},${altitude}</coordinates></Point>
+    </Placemark>`).join("");
+  const kml = `<?xml version="1.0" encoding="UTF-8"?>\n<kml xmlns="http://www.opengis.net/kml/2.2">\n<Document>\n<name>Waypoints de Foto</name>${placemarks}\n</Document>\n</kml>`;
+  downloadBlob(kml, "waypoints_fotos.kml", "application/vnd.google-earth.kml+xml");
+}
+document.getElementById("exportGradeKML").addEventListener("click", exportarWaypointsKML);
+
+////////////////////////////////////////////////////////////////////////////
+// EXTRACT COORDINATES  (panel: view / copy / download)
+////////////////////////////////////////////////////////////////////////////
+
+const coordPanel = document.getElementById("coordPanel");
+const coordText  = document.getElementById("coordText");
+
+function planoLayers() { return planosMG.entries.map(e => e.layer); }
+
+function planosToGeoJSON() {
+  const features = [];
+  planoLayers().forEach(layer => {
+    if (typeof layer.toGeoJSON !== "function") return;
+    const gj = layer.toGeoJSON();
+    if (gj.type === "Feature") {
+      if (layer.__name) gj.properties = Object.assign({ nome:layer.__name }, gj.properties);
+      features.push(gj);
+    } else if (gj.type === "FeatureCollection") {
+      features.push(...gj.features);
+    }
+  });
+  return { type:"FeatureCollection", features };
+}
+
+function buildCoordReport() {
+  const layers = planoLayers();
+  if (!layers.length) return "Nenhuma forma no plano de voo.";
+  let out = "";
+  layers.forEach((layer, idx) => {
+    const g = layer.toGeoJSON().geometry;
+    let pts = [];
+    if (g.type === "LineString") pts = g.coordinates;
+    else if (g.type === "Polygon") pts = g.coordinates[0];
+    else if (g.type === "Point") pts = [g.coordinates];
+    out += `#${idx + 1}  ${describePlano(layer)}  (${pts.length} ponto(s))  — lat, lon\n`;
+    pts.forEach(c => { out += `   ${c[1].toFixed(6)}, ${c[0].toFixed(6)}\n`; });
+    out += "\n";
+  });
+  out += "----- GeoJSON -----\n" + JSON.stringify(planosToGeoJSON(), null, 2);
+  return out;
+}
+
+function openCoordPanel() {
+  coordText.textContent = buildCoordReport();
+  coordPanel.hidden = false;
+}
+window.openCoordPanel = openCoordPanel;
+
+document.getElementById("showCoords").addEventListener("click", openCoordPanel);
+document.getElementById("coordClose").addEventListener("click", () => coordPanel.hidden = true);
+
+document.getElementById("coordCopy").addEventListener("click", async () => {
+  try {
+    await navigator.clipboard.writeText(coordText.textContent);
+    setStatus("statusPlanos", "Coordenadas copiadas.");
+  } catch {
+    setStatus("statusPlanos", "Copie manualmente do painel.");
+  }
+});
+
+document.getElementById("coordDownload").addEventListener("click", () => {
+  const fc = planosToGeoJSON();
+  if (!fc.features.length) return;
+  downloadBlob(JSON.stringify(fc, null, 2), "plano_voo.geojson", "application/geo+json");
+});
+
+////////////////////////////////////////////////////////////////////////////
+// EXPORT KML / GEOJSON
+////////////////////////////////////////////////////////////////////////////
+
+function downloadBlob(content, filename, type) {
+  const blob = new Blob([content], { type });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url; a.download = filename;
+  document.body.appendChild(a); a.click(); a.remove();
+  URL.revokeObjectURL(url);
+}
+
+document.getElementById("exportGeoJSON").addEventListener("click", () => {
+  const fc = planosToGeoJSON();
+  if (!fc.features.length) return alert("Nenhum plano carregado.");
+  downloadBlob(JSON.stringify(fc, null, 2), "plano_voo.geojson", "application/geo+json");
+});
+
+document.getElementById("exportKML").addEventListener("click", () => {
+  const layers = planoLayers();
+  if (!layers.length) return alert("Nenhum plano carregado.");
+  let placemarks = "";
+  layers.forEach(layer => {
+    const geom = layer.toGeoJSON().geometry;
+    const nm = describePlano(layer);
+    if (geom.type === "LineString") {
+      const coords = geom.coordinates.map(p => `${p[0]},${p[1]},0`).join(" ");
+      placemarks += `\n<Placemark><name>${nm}</name><LineString><tessellate>1</tessellate>` +
+        `<coordinates>${coords}</coordinates></LineString></Placemark>`;
+    }
+    if (geom.type === "Polygon") {
+      const coords = geom.coordinates[0].map(p => `${p[0]},${p[1]},0`).join(" ");
+      placemarks += `\n<Placemark><name>${nm}</name><Polygon><outerBoundaryIs><LinearRing>` +
+        `<coordinates>${coords}</coordinates></LinearRing></outerBoundaryIs></Polygon></Placemark>`;
+    }
+  });
+  const kml = `<?xml version="1.0" encoding="UTF-8"?>\n<kml xmlns="http://www.opengis.net/kml/2.2">\n<Document>${placemarks}\n</Document>\n</kml>`;
+  downloadBlob(kml, "plano_voo.kml", "application/vnd.google-earth.kml+xml");
+});
+
+////////////////////////////////////////////////////////////////////////////
+// INTERSECTION CHECK  (plan vs restriction zones)
+////////////////////////////////////////////////////////////////////////////
+
+document.getElementById("check").addEventListener("click", () => {
+  const layers = planoLayers();
+  if (!layers.length) return alert("Nenhum plano de voo desenhado ou importado.");
+
+  layers.forEach(layer => layer.setStyle && layer.setStyle({ color:PLANO_COLOR, weight:4 }));
+  const dists = bufferDistances();
+  const hits = [];
+
+  layers.forEach(planoLayer => {
+    const voo = planoLayer.toGeoJSON();
+    bufferLayers.forEach((bl,i) => {
+      bl.eachLayer(bufferLayer => {
+        const zona = bufferLayer.toGeoJSON();
+        if (turf.booleanIntersects(voo, zona)) {
+          hits.push({ dist:dists[i], name:getAirportName(zona) });
+          if (planoLayer.setStyle) planoLayer.setStyle({ color:BUFFER_COLORS[i], weight:6 });
+        }
+      });
+    });
+  });
+
+  if (!hits.length) return alert("Nenhuma interseção com as zonas de restrição.");
+  alert("Interseções encontradas:\n\n" +
+    hits.map(h => `• ${h.name} — zona de ${h.dist} m`).join("\n"));
+});
+
+////////////////////////////////////////////////////////////////////////////
+// INIT
+////////////////////////////////////////////////////////////////////////////
+
+renderViz();
+carregarVoosPadrao();
+window.addEventListener("resize", () => map.invalidateSize());
+</script>
 
 </body>
 </html>
