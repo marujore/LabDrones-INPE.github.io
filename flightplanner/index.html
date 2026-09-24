@@ -85,18 +85,6 @@ body{ display:flex; overflow:hidden; }
 .tab.active{ background:var(--accent); color:#fff; }
 .tabpane[hidden]{ display:none; }
 
-/* ---------------------------------------------------------------- ACCORDION */
-.accordion-header{
-  display:flex; align-items:center; justify-content:space-between;
-  cursor:pointer; user-select:none;
-}
-.accordion-header .chevron{
-  font-size:11px; color:#9fb3c8; transition:transform .2s ease; flex:0 0 auto; margin-left:8px;
-}
-.accordion-header.collapsed .chevron{ transform:rotate(-90deg); }
-.accordion-body[hidden]{ display:none; }
-.accordion-body{ margin-top:8px; }
-
 .group{
   border-top:1px solid var(--sidebar-bg-2);
   padding-top:12px;
@@ -176,18 +164,19 @@ button.active{ background:#f39c12; color:#20303d; }
 .viz-group:first-child{ border-top:none; }
 
 .viz-row{ display:flex; align-items:center; gap:7px; padding:4px 2px; font-size:12.5px; }
+.v-master-hit{ display:flex; align-items:center; gap:7px; flex:1; min-width:0; cursor:pointer; padding:6px 0; }
 .viz-master .v-name{ flex:1; font-weight:bold; }
 .v-count{ color:#8ba0b4; font-size:11px; min-width:16px; text-align:right; }
 .swatch{ width:12px; height:12px; border-radius:3px; flex:0 0 auto; }
 
 .viz-children{ max-height:220px; overflow-y:auto; }
 .viz-children[hidden]{ display:none; }
-.viz-child{ padding-left:22px; color:#cdd8e2; cursor:pointer; }
+.viz-child{ padding-left:22px; color:#cdd8e2; cursor:pointer; padding-top:6px; padding-bottom:6px; }
 .viz-child span{ overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
 
 .v-expand,.trash{
   background:none; border:none; color:#8ba0b4; cursor:pointer;
-  width:auto; min-height:auto; margin:0; padding:2px 4px; font-size:12px;
+  width:auto; min-height:auto; margin:0; padding:8px; font-size:14px; line-height:1;
 }
 .v-expand:hover,.trash:hover{ color:#fff; background:none; }
 
@@ -346,102 +335,45 @@ button.active{ background:#f39c12; color:#20303d; }
 
     <!-- ----------------------------------------------------- PLANO DE VOO -->
     <div class="group">
-      <h2 class="accordion-header" data-target="acc-plano">Plano de voo <span class="chevron">▾</span></h2>
-      <div class="accordion-body" id="acc-plano">
-        <div class="hint">Desenhe a rota com as ferramentas no canto do mapa, gere uma área a partir de um ponto, ou importe um KML.</div>
-        <input type="file" id="uploadKML" accept=".kml">
+      <h2>Plano de voo</h2>
+      <div class="hint">Desenhe a rota com as ferramentas no canto do mapa, gere uma área a partir de um ponto, ou importe um KML.</div>
+      <input type="file" id="uploadKML" accept=".kml">
 
-        <div class="subsection">
-          <h3>Área a partir de um ponto</h3>
-          <div class="hint">Jeito rápido de montar o plano: defina o formato e as medidas, clique em "Selecionar ponto no mapa" e depois num ponto do mapa.</div>
+      <div class="subsection">
+        <h3>Área a partir de um ponto</h3>
+        <div class="hint">Jeito rápido de montar o plano: defina o formato e as medidas, clique em "Selecionar ponto no mapa" e depois num ponto do mapa.</div>
 
-          <label>Formato</label>
-          <select id="areaShape">
-            <option value="circle">Círculo</option>
-            <option value="rect">Retângulo</option>
-          </select>
-
-          <div id="areaCircleFields">
-            <label>Raio (m)</label>
-            <input type="number" id="areaRadius" value="1000" min="1" step="50">
-          </div>
-
-          <div id="areaRectFields" hidden>
-            <div class="row">
-              <div><label>Largura (m)</label><input type="number" id="areaWidth"  value="1000" min="1" step="50"></div>
-              <div><label>Altura (m)</label> <input type="number" id="areaHeight" value="1000" min="1" step="50"></div>
-            </div>
-          </div>
-
-          <button id="pickPoint">Selecionar ponto no mapa</button>
-          <div id="statusArea" class="status"></div>
-        </div>
-
-        <button id="moveMode" class="ghost">✋ Mover formas: desligado</button>
-        <button id="showCoords">📋 Ver / extrair coordenadas</button>
-        <button id="check" class="primary">Verificar interseção</button>
-        <div class="row">
-          <button id="exportKML" class="ghost">Exportar KML</button>
-          <button id="exportGeoJSON" class="ghost">Exportar GeoJSON</button>
-        </div>
-        <button id="clearPlanos" class="danger">Limpar plano de voo</button>
-        <div id="statusPlanos" class="status"></div>
-      </div>
-    </div>
-
-    <!-- ------------------------------------------------- GRADE DE VOO (FOTOGRAMETRIA) -->
-    <div class="group">
-      <h2 class="accordion-header collapsed" data-target="acc-grade">Grade de voo automática <span class="chevron">▾</span></h2>
-      <div class="accordion-body" id="acc-grade" hidden>
-        <div class="hint">
-          Gera automaticamente as linhas de voo (padrão vai-e-vem) e os pontos de disparo
-          sobre um polígono/retângulo já existente no plano de voo acima — desenhado, criado a
-          partir de um ponto ou importado de KML.
-        </div>
-
-        <label>Área de interesse (AOI)</label>
-        <select id="gridAoiSelect"></select>
-
-        <label>Modelo de câmera</label>
-        <select id="gridCameraSelect">
-          <option value="phantom4pro">DJI Phantom 4 Pro</option>
-          <option value="mavic2pro">DJI Mavic 2 Pro</option>
-          <option value="mini4pro">DJI Mini 4 Pro</option>
-          <option value="custom">Personalizada...</option>
+        <label>Formato</label>
+        <select id="areaShape">
+          <option value="circle">Círculo</option>
+          <option value="rect">Retângulo</option>
         </select>
-        <div class="row">
-          <div><label>Sensor L (mm)</label><input type="number" id="gridSensorW" step="0.1" disabled></div>
-          <div><label>Sensor A (mm)</label><input type="number" id="gridSensorH" step="0.1" disabled></div>
-        </div>
-        <div class="row">
-          <div><label>Focal (mm)</label><input type="number" id="gridFocal" step="0.1" disabled></div>
-          <div><label>Img. L (px)</label><input type="number" id="gridImgW" step="1" disabled></div>
-        </div>
-        <label>Img. Altura (px)</label>
-        <input type="number" id="gridImgH" step="1" disabled>
 
-        <div class="row">
-          <div><label>Altitude (m)</label><input type="number" id="gridAltitude" value="100" min="1" step="1"></div>
-          <div><label>Velocidade (m/s)</label><input type="number" id="gridVelocidade" value="8" min="0.5" step="0.5"></div>
-        </div>
-        <div class="row">
-          <div><label>Sobrep. Frontal (%)</label><input type="number" id="gridOverlapFrontal" value="80" min="0" max="95" step="1"></div>
-          <div><label>Sobrep. Lateral (%)</label><input type="number" id="gridOverlapLateral" value="70" min="0" max="95" step="1"></div>
+        <div id="areaCircleFields">
+          <label>Raio (m)</label>
+          <input type="number" id="areaRadius" value="1000" min="1" step="50">
         </div>
 
-        <label>Ângulo da grade: <span id="gridAnguloValor">0°</span></label>
-        <input type="range" id="gridAngulo" min="0" max="179" step="1" value="0">
-        <button id="sugerirAngulo" class="ghost">🧭 Sugerir melhor ângulo</button>
-
-        <button id="gerarGrade" class="primary">🛩️ Gerar Grade de Voo</button>
-        <div id="statusGrade" class="status"></div>
-
-        <div class="row">
-          <button id="exportGradeKML" class="ghost">Waypoints (KML)</button>
-          <button id="exportGradeGeoJSON" class="ghost">Waypoints (GeoJSON)</button>
+        <div id="areaRectFields" hidden>
+          <div class="row">
+            <div><label>Largura (m)</label><input type="number" id="areaWidth"  value="1000" min="1" step="50"></div>
+            <div><label>Altura (m)</label> <input type="number" id="areaHeight" value="1000" min="1" step="50"></div>
+          </div>
         </div>
-        <button id="clearGrade" class="danger">Limpar grade de voo</button>
+
+        <button id="pickPoint">Selecionar ponto no mapa</button>
+        <div id="statusArea" class="status"></div>
       </div>
+
+      <button id="moveMode" class="ghost">✋ Mover formas: desligado</button>
+      <button id="showCoords">📋 Ver / extrair coordenadas</button>
+      <button id="check" class="primary">Verificar interseção</button>
+      <div class="row">
+        <button id="exportKML" class="ghost">Exportar KML</button>
+        <button id="exportGeoJSON" class="ghost">Exportar GeoJSON</button>
+      </div>
+      <button id="clearPlanos" class="danger">Limpar plano de voo</button>
+      <div id="statusPlanos" class="status"></div>
     </div>
   </div>
 </div>
@@ -542,15 +474,6 @@ document.querySelectorAll(".tab").forEach(t => {
   });
 });
 
-// Seções recolhíveis (acordeão) dentro de uma aba, ex: "Planejar Voo"
-document.querySelectorAll(".accordion-header").forEach(h => {
-  h.addEventListener("click", () => {
-    const body = document.getElementById(h.dataset.target);
-    body.hidden = !body.hidden;
-    h.classList.toggle("collapsed", body.hidden);
-  });
-});
-
 ////////////////////////////////////////////////////////////////////////////
 // LAYER GROUPS
 ////////////////////////////////////////////////////////////////////////////
@@ -629,11 +552,6 @@ ManagedGroup.prototype.clear = function () {
   this.entries = [];
   renderViz();
 };
-ManagedGroup.prototype.removeOne = function (layer) {
-  this.group.removeLayer(layer);
-  this.entries = this.entries.filter(e => e.layer !== layer);
-  renderViz();
-};
 
 const planosMG = new ManagedGroup(planos, describePlano);
 const voosMG   = new ManagedGroup(voos, l =>
@@ -673,10 +591,12 @@ function renderViz() {
     const master = document.createElement("div");
     master.className = "viz-row viz-master";
     master.innerHTML =
-      `<input type="checkbox" class="v-master" ${map.hasLayer(mg.group) ? "checked" : ""}>` +
-      `<span class="swatch" style="background:${cfg.color}"></span>` +
-      `<span class="v-name">${cfg.label}</span>` +
-      `<span class="v-count">${mg.entries.length}</span>` +
+      `<label class="v-master-hit">` +
+        `<input type="checkbox" class="v-master" ${map.hasLayer(mg.group) ? "checked" : ""}>` +
+        `<span class="swatch" style="background:${cfg.color}"></span>` +
+        `<span class="v-name">${cfg.label}</span>` +
+        `<span class="v-count">${mg.entries.length}</span>` +
+      `</label>` +
       `<button class="v-expand" title="Expandir/recolher">${cfg.open ? "▾" : "▸"}</button>` +
       `<button class="trash" title="Remover dados desta camada">🗑</button>`;
     grp.appendChild(master);
@@ -727,8 +647,6 @@ function renderViz() {
 
     vizEl.appendChild(grp);
   });
-
-  refreshGridAoiOptions();
 }
 
 ////////////////////////////////////////////////////////////////////////////
@@ -1116,291 +1034,6 @@ document.getElementById("clearPlanos").addEventListener("click", () => {
   planosMG.clear();
   setStatus("statusPlanos", "Plano de voo removido.");
 });
-
-////////////////////////////////////////////////////////////////////////////
-// GRADE DE VOO AUTOMÁTICA (fotogrametria: grid boustrophedon + waypoints)
-////////////////////////////////////////////////////////////////////////////
-
-const PRESETS_CAMERA = {
-  phantom4pro: { sensorW:13.2, sensorH:8.8,  focal:8.8,   imgW:5472, imgH:3648 },
-  mavic2pro:   { sensorW:13.2, sensorH:8.8,  focal:10.26, imgW:5472, imgH:3648 },
-  mini4pro:    { sensorW:9.7,  sensorH:7.3,  focal:6.7,   imgW:4032, imgH:3024 },
-  custom:      { sensorW:13.2, sensorH:8.8,  focal:8.8,   imgW:5472, imgH:3648 }
-};
-
-let gradeAtual = null;        // { linhaLatLng, waypoints, stats }
-let gradeLineLayer = null;    // polilinha registrada em planosMG (participa de Visualização/exportação)
-const gradeWaypointsLayer = L.layerGroup(); // apenas visual (não gerenciado), com limite de marcadores
-
-// --- Câmera: presets x campos personalizados ---
-function trocarPresetCameraGrade() {
-  const chave = document.getElementById("gridCameraSelect").value;
-  const preset = PRESETS_CAMERA[chave];
-  const personalizado = chave === "custom";
-
-  document.getElementById("gridSensorW").value = preset.sensorW;
-  document.getElementById("gridSensorH").value = preset.sensorH;
-  document.getElementById("gridFocal").value = preset.focal;
-  document.getElementById("gridImgW").value = preset.imgW;
-  document.getElementById("gridImgH").value = preset.imgH;
-
-  ["gridSensorW","gridSensorH","gridFocal","gridImgW","gridImgH"].forEach(id => {
-    document.getElementById(id).disabled = !personalizado;
-  });
-}
-document.getElementById("gridCameraSelect").addEventListener("change", trocarPresetCameraGrade);
-trocarPresetCameraGrade();
-
-document.getElementById("gridAngulo").addEventListener("input", e => {
-  document.getElementById("gridAnguloValor").textContent = e.target.value + "°";
-});
-
-// --- Seleção da AOI: lista os polígonos/retângulos já existentes no plano de voo ---
-function refreshGridAoiOptions() {
-  const select = document.getElementById("gridAoiSelect");
-  if (!select) return; // ainda não renderizado (primeira chamada, durante o load)
-  const valorAnterior = select.value;
-
-  const candidatos = planosMG.entries.filter(e => e.layer instanceof L.Polygon);
-  select.innerHTML = "";
-  if (!candidatos.length) {
-    const opt = document.createElement("option");
-    opt.value = "";
-    opt.textContent = "— nenhuma área disponível —";
-    select.appendChild(opt);
-    select.disabled = true;
-    return;
-  }
-  select.disabled = false;
-  candidatos.forEach((entry) => {
-    const idx = planosMG.entries.indexOf(entry);
-    const opt = document.createElement("option");
-    opt.value = String(idx);
-    opt.textContent = `#${idx + 1} ${entry.name}`;
-    select.appendChild(opt);
-  });
-  // mantém a seleção anterior quando ainda existir; senão usa a área mais recente
-  if ([...select.options].some(o => o.value === valorAnterior)) {
-    select.value = valorAnterior;
-  } else {
-    select.value = select.options[select.options.length - 1].value;
-  }
-}
-
-function getAoiSelecionada() {
-  const select = document.getElementById("gridAoiSelect");
-  const idx = parseInt(select.value, 10);
-  const entry = planosMG.entries[idx];
-  if (!entry) return null;
-  let latlngs = entry.layer.getLatLngs();
-  while (Array.isArray(latlngs[0])) latlngs = latlngs[0]; // desconsidera anéis internos (buracos)
-  return latlngs.map(p => [p.lat, p.lng]);
-}
-
-// --- Geometria auxiliar: projeção local em metros (equirretangular, válida para áreas pequenas) ---
-function projetarMetros(lat, lng, latRef) {
-  return [lng * mPerDegLon(latRef), lat * M_PER_DEG_LAT];
-}
-function projetarLatLng(x, y, latRef) {
-  return [y / M_PER_DEG_LAT, x / mPerDegLon(latRef)];
-}
-function rotacionarPonto(x, y, anguloGraus) {
-  const r = anguloGraus * Math.PI / 180;
-  return [x * Math.cos(r) - y * Math.sin(r), x * Math.sin(r) + y * Math.cos(r)];
-}
-function distanciaMetrosLL(p1, p2) {
-  const latRef = (p1[0] + p2[0]) / 2;
-  const [x1, y1] = projetarMetros(p1[0], p1[1], latRef);
-  const [x2, y2] = projetarMetros(p2[0], p2[1], latRef);
-  return Math.hypot(x2 - x1, y2 - y1);
-}
-
-// Sugere o ângulo alinhado com a maior aresta da AOI (reduz manobras de curva)
-function sugerirMelhorAnguloGrade() {
-  const aoi = getAoiSelecionada();
-  if (!aoi) return setStatus("statusGrade", "Selecione uma área de interesse primeiro.");
-
-  const latRef = aoi.reduce((s, p) => s + p[0], 0) / aoi.length;
-  const ptsM = aoi.map(p => projetarMetros(p[0], p[1], latRef));
-
-  let maiorComprimento = -1, melhorAngulo = 0;
-  for (let i = 0; i < ptsM.length; i++) {
-    const [x1, y1] = ptsM[i];
-    const [x2, y2] = ptsM[(i + 1) % ptsM.length];
-    const comprimento = Math.hypot(x2 - x1, y2 - y1);
-    if (comprimento > maiorComprimento) {
-      maiorComprimento = comprimento;
-      melhorAngulo = ((Math.atan2(y2 - y1, x2 - x1) * 180 / Math.PI) % 180 + 180) % 180;
-    }
-  }
-  const slider = document.getElementById("gridAngulo");
-  slider.value = Math.round(melhorAngulo);
-  document.getElementById("gridAnguloValor").textContent = slider.value + "°";
-}
-document.getElementById("sugerirAngulo").addEventListener("click", sugerirMelhorAnguloGrade);
-
-// --- Geração da grade (padrão boustrophedon / vai-e-vem) ---
-function gerarGradeDeVoo() {
-  const aoi = getAoiSelecionada();
-  if (!aoi || aoi.length < 3) {
-    return setStatus("statusGrade", "Nenhuma área de interesse selecionada — desenhe, crie a partir de um ponto ou importe um KML na seção 'Plano de voo' primeiro.");
-  }
-
-  const altitude = parseFloat(document.getElementById("gridAltitude").value);
-  const velocidade = parseFloat(document.getElementById("gridVelocidade").value);
-  const overlapFrontal = parseFloat(document.getElementById("gridOverlapFrontal").value);
-  const overlapLateral = parseFloat(document.getElementById("gridOverlapLateral").value);
-  const angulo = parseFloat(document.getElementById("gridAngulo").value);
-  const sensorW = parseFloat(document.getElementById("gridSensorW").value);
-  const sensorH = parseFloat(document.getElementById("gridSensorH").value);
-  const focal = parseFloat(document.getElementById("gridFocal").value);
-  const imgW = parseFloat(document.getElementById("gridImgW").value);
-  const imgH = parseFloat(document.getElementById("gridImgH").value);
-
-  if ([altitude, velocidade, overlapFrontal, overlapLateral, sensorW, sensorH, focal, imgW, imgH].some(v => isNaN(v) || v <= 0)) {
-    return setStatus("statusGrade", "Verifique os parâmetros — todos os campos devem ser números positivos.");
-  }
-
-  const gsdX = (sensorW / imgW) * altitude / focal; // m/px, transversal ao voo
-  const gsdY = (sensorH / imgH) * altitude / focal; // m/px, na direção do voo
-  const footprintCross = gsdX * imgW;
-  const footprintAlong = gsdY * imgH;
-  const espacamentoLinhas = footprintCross * (1 - overlapLateral / 100);
-  const intervaloFotos = footprintAlong * (1 - overlapFrontal / 100);
-
-  if (espacamentoLinhas < 0.5 || intervaloFotos < 0.5) {
-    return setStatus("statusGrade", "Sobreposição alta demais para a altitude/câmera informadas.");
-  }
-
-  const latRef = aoi.reduce((s, p) => s + p[0], 0) / aoi.length;
-  const ptsOriginais = aoi.map(p => projetarMetros(p[0], p[1], latRef));
-  const ptsRot = ptsOriginais.map(([x, y]) => rotacionarPonto(x, y, -angulo));
-
-  const minY = Math.min(...ptsRot.map(p => p[1]));
-  const maxY = Math.max(...ptsRot.map(p => p[1]));
-
-  // Varredura (scanline): para cada linha, encontra os segmentos internos ao polígono (regra par-ímpar)
-  const linhas = [];
-  for (let y = minY + espacamentoLinhas / 2; y <= maxY; y += espacamentoLinhas) {
-    const intersecoesX = [];
-    for (let i = 0; i < ptsRot.length; i++) {
-      const [x1, y1] = ptsRot[i];
-      const [x2, y2] = ptsRot[(i + 1) % ptsRot.length];
-      if ((y1 <= y && y2 > y) || (y2 <= y && y1 > y)) {
-        intersecoesX.push(x1 + (y - y1) / (y2 - y1) * (x2 - x1));
-      }
-    }
-    intersecoesX.sort((a, b) => a - b);
-    for (let i = 0; i + 1 < intersecoesX.length; i += 2) {
-      linhas.push([[intersecoesX[i], y], [intersecoesX[i + 1], y]]);
-    }
-  }
-
-  if (!linhas.length) {
-    return setStatus("statusGrade", "Não foi possível gerar linhas — a área pode ser pequena demais para o espaçamento calculado.");
-  }
-
-  const caminhoRot = [];
-  const waypointsRot = [];
-  linhas.forEach((linha, idx) => {
-    const [a, b] = idx % 2 === 0 ? linha : [linha[1], linha[0]];
-    caminhoRot.push(a, b);
-    const comprimento = Math.hypot(b[0] - a[0], b[1] - a[1]);
-    const dirX = (b[0] - a[0]) / comprimento, dirY = (b[1] - a[1]) / comprimento;
-    for (let d = 0; d <= comprimento; d += intervaloFotos) {
-      waypointsRot.push([a[0] + dirX * d, a[1] + dirY * d]);
-    }
-    waypointsRot.push(b);
-  });
-
-  const caminhoLatLng = caminhoRot.map(([x, y]) => {
-    const [xo, yo] = rotacionarPonto(x, y, angulo);
-    return projetarLatLng(xo, yo, latRef);
-  });
-  const waypoints = waypointsRot.map(([x, y]) => {
-    const [xo, yo] = rotacionarPonto(x, y, angulo);
-    return projetarLatLng(xo, yo, latRef);
-  });
-
-  let distanciaTotal = 0;
-  for (let i = 0; i + 1 < caminhoLatLng.length; i++) {
-    distanciaTotal += distanciaMetrosLL(caminhoLatLng[i], caminhoLatLng[i + 1]);
-  }
-  const areaM2 = Math.abs(turf.area(turf.polygon([aoi.map(p => [p[1], p[0]]).concat([[aoi[0][1], aoi[0][0]]])])));
-
-  gradeAtual = {
-    linhaLatLng: caminhoLatLng,
-    waypoints,
-    stats: {
-      gsd: ((gsdX + gsdY) / 2 * 100).toFixed(2),
-      area: (areaM2 / 10000).toFixed(2),
-      numLinhas: linhas.length,
-      espacamentoLinhas: espacamentoLinhas.toFixed(1),
-      intervaloFotos: intervaloFotos.toFixed(1),
-      distancia: (distanciaTotal / 1000).toFixed(2),
-      tempo: ((distanciaTotal / velocidade) / 60).toFixed(1),
-      numFotos: waypoints.length
-    }
-  };
-
-  // Remove a rota anterior (se houver) antes de registrar a nova
-  if (gradeLineLayer) { planosMG.removeOne(gradeLineLayer); gradeLineLayer = null; }
-  gradeLineLayer = L.polyline(caminhoLatLng, { color:"#e74c3c", weight:3, draggable:true });
-  registerPlano(gradeLineLayer, "Rota de voo (grade automática)");
-
-  gradeWaypointsLayer.clearLayers();
-  const LIMITE_MARCADORES = 400;
-  if (waypoints.length <= LIMITE_MARCADORES) {
-    waypoints.forEach(wp => {
-      L.circleMarker(wp, { radius:3, color:"#fff", weight:1, fillColor:"#f39c12", fillOpacity:1 }).addTo(gradeWaypointsLayer);
-    });
-  }
-  if (!map.hasLayer(gradeWaypointsLayer)) gradeWaypointsLayer.addTo(map);
-
-  const s = gradeAtual.stats;
-  setStatus("statusGrade",
-    `Área: ${s.area} ha · GSD: ${s.gsd} cm/px · ${s.numLinhas} linha(s) · ` +
-    `espaç. ${s.espacamentoLinhas} m · fotos a cada ${s.intervaloFotos} m · ` +
-    `${s.distancia} km · ~${s.tempo} min · ${s.numFotos} foto(s).`);
-}
-document.getElementById("gerarGrade").addEventListener("click", gerarGradeDeVoo);
-
-function limparGrade() {
-  if (gradeLineLayer) { planosMG.removeOne(gradeLineLayer); gradeLineLayer = null; }
-  gradeWaypointsLayer.clearLayers();
-  map.removeLayer(gradeWaypointsLayer);
-  gradeAtual = null;
-  setStatus("statusGrade", "Grade de voo removida.");
-}
-document.getElementById("clearGrade").addEventListener("click", limparGrade);
-
-// --- Exportação específica dos waypoints de foto ---
-function exportarWaypointsGeoJSON() {
-  if (!gradeAtual || !gradeAtual.waypoints.length) return alert("Gere a grade de voo antes de exportar.");
-  const fc = {
-    type: "FeatureCollection",
-    features: gradeAtual.waypoints.map((p, i) => ({
-      type: "Feature",
-      properties: { nome: `Foto ${i + 1}`, altitude: document.getElementById("gridAltitude").value },
-      geometry: { type: "Point", coordinates: [p[1], p[0]] }
-    }))
-  };
-  downloadBlob(JSON.stringify(fc, null, 2), "waypoints_fotos.geojson", "application/geo+json");
-}
-document.getElementById("exportGradeGeoJSON").addEventListener("click", exportarWaypointsGeoJSON);
-
-function exportarWaypointsKML() {
-  if (!gradeAtual || !gradeAtual.waypoints.length) return alert("Gere a grade de voo antes de exportar.");
-  const altitude = document.getElementById("gridAltitude").value;
-  const placemarks = gradeAtual.waypoints.map((p, i) => `
-    <Placemark>
-      <name>Foto ${i + 1}</name>
-      <Point><coordinates>${p[1]},${p[0]},${altitude}</coordinates></Point>
-    </Placemark>`).join("");
-  const kml = `<?xml version="1.0" encoding="UTF-8"?>\n<kml xmlns="http://www.opengis.net/kml/2.2">\n<Document>\n<name>Waypoints de Foto</name>${placemarks}\n</Document>\n</kml>`;
-  downloadBlob(kml, "waypoints_fotos.kml", "application/vnd.google-earth.kml+xml");
-}
-document.getElementById("exportGradeKML").addEventListener("click", exportarWaypointsKML);
 
 ////////////////////////////////////////////////////////////////////////////
 // EXTRACT COORDINATES  (panel: view / copy / download)
