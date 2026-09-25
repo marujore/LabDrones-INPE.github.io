@@ -286,8 +286,9 @@ button.active{ background:#f39c12; color:#20303d; }
       <h2>Aeroportos</h2>
       <div class="hint">Camada de complexos aeroportuários (IBGE/SGB via WFS) ou geometria própria.</div>
       <button id="loadWFS">Carregar aeroportos (WFS)</button>
-      <label>Ou envie sua geometria (GeoJSON/KML)</label>
-      <input type="file" id="uploadAeroporto" accept=".geojson,.json,.kml">
+      <label>Ou envie sua geometria</label>
+      <input type="file" id="uploadAeroporto" accept=".geojson,.json,.kml,.zip,.shp,.gpkg">
+      <div class="hint">Formatos aceitos: GeoJSON, KML, Shapefile (.zip com .shp+.dbf+.prj) e GeoPackage (.gpkg).</div>
 
       <label>Formato da zona de restrição</label>
       <select id="bufferShape">
@@ -318,8 +319,9 @@ button.active{ background:#f39c12; color:#20303d; }
   <div id="tab-voos" class="tabpane" hidden>
     <div class="group">
       <h2>Voos anteriores (banco INPE)</h2>
-      <div class="hint">Carregado automaticamente do banco do GeoCatalog. Envie outro GeoJSON para substituir, ou volte ao padrão. Filtro por ano e plataforma.</div>
-      <input type="file" id="uploadVoos" accept=".geojson,.json">
+      <div class="hint">Carregado automaticamente do banco do GeoCatalog. Envie outro arquivo para substituir, ou volte ao padrão. Filtro por ano e plataforma.</div>
+      <input type="file" id="uploadVoos" accept=".geojson,.json,.kml,.zip,.shp,.gpkg">
+      <div class="hint">Formatos aceitos: GeoJSON, KML, Shapefile (.zip com .shp+.dbf+.prj) e GeoPackage (.gpkg).</div>
       <button id="reloadVoosPadrao" class="ghost">↺ Usar banco padrão</button>
       <label>Ano</label>
       <select id="filterAno" multiple size="4"></select>
@@ -336,8 +338,8 @@ button.active{ background:#f39c12; color:#20303d; }
     <!-- ----------------------------------------------------- PLANO DE VOO -->
     <div class="group">
       <h2>Plano de voo</h2>
-      <div class="hint">Desenhe a rota com as ferramentas no canto do mapa, gere uma área a partir de um ponto, ou importe um KML.</div>
-      <input type="file" id="uploadKML" accept=".kml">
+      <div class="hint">Desenhe a rota com as ferramentas no canto do mapa, gere uma área a partir de um ponto, ou importe um arquivo pronto (GeoJSON, KML, Shapefile .zip ou GeoPackage).</div>
+      <input type="file" id="uploadPlano" accept=".geojson,.json,.kml,.zip,.shp,.gpkg">
 
       <div class="subsection">
         <h3>Área a partir de um ponto</h3>
@@ -423,6 +425,109 @@ const M_PER_DEG_LAT = 111320;
 const mPerDegLon = lat => 111320 * Math.cos(lat * Math.PI / 180);
 
 function setStatus(id, msg) { document.getElementById(id).textContent = msg; }
+
+////////////////////////////////////////////////////////////////////////////
+// LEITURA MULTIFORMATO (KML, GeoJSON, Shapefile .zip/.shp, GeoPackage .gpkg)
+////////////////////////////////////////////////////////////////////////////
+
+// shpjs e geopackage-js só são baixados sob demanda (a segunda pesa ~1MB+wasm),
+// assim quem nunca envia .shp/.gpkg não paga esse custo de carregamento.
+const SHPJS_URL = "https://cdn.jsdelivr.net/npm/shpjs@6.2.0/dist/shp.js";
+const GEOPACKAGE_URL = "https://cdn.jsdelivr.net/npm/@ngageoint/geopackage@4.2.9/dist/geopackage.min.js";
+const GEOPACKAGE_BASE = "https://cdn.jsdelivr.net/npm/@ngageoint/geopackage@4.2.9/dist/";
+
+const scriptsCarregados = {};
+function carregarScript(url) {
+  if (!scriptsCarregados[url]) {
+    scriptsCarregados[url] = new Promise((resolve, reject) => {
+      const script = document.createElement("script");
+      script.src = url;
+      script.onload = () => resolve();
+      script.onerror = () => reject(new Error("Falha ao carregar " + url));
+      document.head.appendChild(script);
+    });
+  }
+  return scriptsCarregados[url];
+}
+
+async function garantirShpjs() {
+  if (typeof shp === "undefined") await carregarScript(SHPJS_URL);
+}
+
+async function garantirGeoPackage() {
+  if (typeof GeoPackage === "undefined") {
+    await carregarScript(GEOPACKAGE_URL);
+    GeoPackage.setSqljsWasmLocateFile(arquivo => GEOPACKAGE_BASE + arquivo);
+  }
+}
+
+function lerArquivoComoTexto(file) {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => resolve(reader.result);
+    reader.onerror = () => reject(reader.error);
+    reader.readAsText(file);
+  });
+}
+
+function lerArquivoComoArrayBuffer(file) {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => resolve(reader.result);
+    reader.onerror = () => reject(reader.error);
+    reader.readAsArrayBuffer(file);
+  });
+}
+
+// shpjs devolve um FeatureCollection único, ou um array de FeatureCollections
+// quando o .zip tem mais de uma camada — normaliza sempre para um FeatureCollection.
+function normalizarParaFeatureCollection(resultado) {
+  if (Array.isArray(resultado)) {
+    return { type: "FeatureCollection", features: resultado.flatMap(fc => fc.features || []) };
+  }
+  return resultado;
+}
+
+async function lerGeoPackage(arrayBuffer) {
+  const gp = await GeoPackage.GeoPackageAPI.open(new Uint8Array(arrayBuffer));
+  try {
+    const features = [];
+    gp.getFeatureTables().forEach(nomeTabela => {
+      const resultSet = gp.queryForGeoJSONFeaturesInTable(nomeTabela);
+      for (const feature of resultSet) features.push(feature);
+      if (typeof resultSet.close === "function") resultSet.close();
+    });
+    return { type: "FeatureCollection", features };
+  } finally {
+    gp.close();
+  }
+}
+
+// Ponto único de entrada usado pelos 3 campos de upload do app: lê KML, GeoJSON,
+// Shapefile (.zip ou .shp avulso) ou GeoPackage (.gpkg) e sempre devolve GeoJSON.
+async function lerArquivoGeoespacial(file) {
+  const nome = file.name.toLowerCase();
+
+  if (nome.endsWith(".kml")) {
+    const texto = await lerArquivoComoTexto(file);
+    return toGeoJSON.kml(new DOMParser().parseFromString(texto, "text/xml"));
+  }
+  if (nome.endsWith(".geojson") || nome.endsWith(".json")) {
+    const texto = await lerArquivoComoTexto(file);
+    return JSON.parse(texto);
+  }
+  if (nome.endsWith(".zip") || nome.endsWith(".shp")) {
+    await garantirShpjs();
+    const buffer = await lerArquivoComoArrayBuffer(file);
+    return normalizarParaFeatureCollection(await shp(buffer));
+  }
+  if (nome.endsWith(".gpkg")) {
+    await garantirGeoPackage();
+    const buffer = await lerArquivoComoArrayBuffer(file);
+    return lerGeoPackage(buffer);
+  }
+  throw new Error("Formato não suportado: " + file.name);
+}
 
 ////////////////////////////////////////////////////////////////////////////
 // MAP + BASE LAYERS (troca pelo botão de camadas, canto sup. direito)
@@ -823,27 +928,21 @@ document.getElementById("loadWFS").addEventListener("click", async () => {
   }
 });
 
-document.getElementById("uploadAeroporto").addEventListener("change", function (e) {
+document.getElementById("uploadAeroporto").addEventListener("change", async function (e) {
   const file = e.target.files[0];
   if (!file) return;
-  const isKML = /\.kml$/i.test(file.name);
-  const reader = new FileReader();
-  reader.onload = evt => {
-    try {
-      const geojson = isKML
-        ? toGeoJSON.kml(new DOMParser().parseFromString(evt.target.result, "text/xml"))
-        : JSON.parse(evt.target.result);
-      aeroportos.addData(geojson);
-      aeroMG.rescan();
-      rebuildBuffers();
-      map.fitBounds(aeroportos.getBounds());
-      setStatus("statusAeroportos", "Geometria de aeroporto adicionada.");
-    } catch (err) {
-      console.error(err);
-      setStatus("statusAeroportos", "Não foi possível ler o arquivo enviado.");
-    }
-  };
-  reader.readAsText(file);
+  setStatus("statusAeroportos", "Lendo " + file.name + "...");
+  try {
+    const geojson = await lerArquivoGeoespacial(file);
+    aeroportos.addData(geojson);
+    aeroMG.rescan();
+    rebuildBuffers();
+    map.fitBounds(aeroportos.getBounds());
+    setStatus("statusAeroportos", "Geometria de aeroporto adicionada.");
+  } catch (err) {
+    console.error(err);
+    setStatus("statusAeroportos", "Não foi possível ler o arquivo enviado (" + err.message + ").");
+  }
   e.target.value = "";
 });
 
@@ -910,22 +1009,19 @@ function applyVooFilter() {
   setStatus("statusVoos", filtered.length + " de " + voosData.features.length + " voo(s) exibido(s).");
 }
 
-document.getElementById("uploadVoos").addEventListener("change", function (e) {
+document.getElementById("uploadVoos").addEventListener("change", async function (e) {
   const file = e.target.files[0];
   if (!file) return;
-  const reader = new FileReader();
-  reader.onload = evt => {
-    try {
-      voosData = JSON.parse(evt.target.result);
-      populateVooFilters(voosData.features || []);
-      applyVooFilter();
-      if (voos.getLayers().length) map.fitBounds(voos.getBounds());
-    } catch (err) {
-      console.error(err);
-      setStatus("statusVoos", "Não foi possível ler o GeoJSON enviado.");
-    }
-  };
-  reader.readAsText(file);
+  setStatus("statusVoos", "Lendo " + file.name + "...");
+  try {
+    voosData = await lerArquivoGeoespacial(file);
+    populateVooFilters(voosData.features || []);
+    applyVooFilter();
+    if (voos.getLayers().length) map.fitBounds(voos.getBounds());
+  } catch (err) {
+    console.error(err);
+    setStatus("statusVoos", "Não foi possível ler o arquivo enviado (" + err.message + ").");
+  }
   e.target.value = "";
 });
 
@@ -995,38 +1091,34 @@ map.on("click", e => {
 });
 
 ////////////////////////////////////////////////////////////////////////////
-// IMPORT KML  (rebuilt as draggable layers)
+// IMPORT PLANO DE VOO  (GeoJSON, KML, Shapefile ou GeoPackage — rebuilt as draggable layers)
 ////////////////////////////////////////////////////////////////////////////
 
-document.getElementById("uploadKML").addEventListener("change", function (e) {
+document.getElementById("uploadPlano").addEventListener("change", async function (e) {
   const file = e.target.files[0];
   if (!file) return;
-  const reader = new FileReader();
-  reader.onload = evt => {
-    try {
-      const xml = new DOMParser().parseFromString(evt.target.result, "text/xml");
-      const geojson = toGeoJSON.kml(xml);
-      L.geoJSON(geojson).eachLayer(layer => {
-        const g = layer.toGeoJSON().geometry;
-        let rebuilt = null;
-        if (g.type === "LineString")
-          rebuilt = L.polyline(g.coordinates.map(c => [c[1], c[0]]),
-            { color:PLANO_COLOR, weight:4, draggable:true });
-        else if (g.type === "Polygon")
-          rebuilt = L.polygon(g.coordinates[0].map(c => [c[1], c[0]]),
-            { color:PLANO_COLOR, draggable:true });
-        else if (g.type === "Point")
-          rebuilt = L.marker([g.coordinates[1], g.coordinates[0]]);
-        if (rebuilt) registerPlano(rebuilt);
-      });
-      if (planos.getLayers().length) map.fitBounds(planos.getBounds());
-      setStatus("statusPlanos", "Plano de voo importado.");
-    } catch (err) {
-      console.error(err);
-      setStatus("statusPlanos", "Não foi possível ler o KML enviado.");
-    }
-  };
-  reader.readAsText(file);
+  setStatus("statusPlanos", "Lendo " + file.name + "...");
+  try {
+    const geojson = await lerArquivoGeoespacial(file);
+    L.geoJSON(geojson).eachLayer(layer => {
+      const g = layer.toGeoJSON().geometry;
+      let rebuilt = null;
+      if (g.type === "LineString")
+        rebuilt = L.polyline(g.coordinates.map(c => [c[1], c[0]]),
+          { color:PLANO_COLOR, weight:4, draggable:true });
+      else if (g.type === "Polygon")
+        rebuilt = L.polygon(g.coordinates[0].map(c => [c[1], c[0]]),
+          { color:PLANO_COLOR, draggable:true });
+      else if (g.type === "Point")
+        rebuilt = L.marker([g.coordinates[1], g.coordinates[0]]);
+      if (rebuilt) registerPlano(rebuilt);
+    });
+    if (planos.getLayers().length) map.fitBounds(planos.getBounds());
+    setStatus("statusPlanos", "Plano de voo importado.");
+  } catch (err) {
+    console.error(err);
+    setStatus("statusPlanos", "Não foi possível ler o arquivo enviado (" + err.message + ").");
+  }
   e.target.value = "";
 });
 
